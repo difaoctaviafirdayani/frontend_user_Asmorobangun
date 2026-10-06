@@ -34,10 +34,9 @@ class Validators {
   static String? passwordRegister(String? v) {
     final t = v ?? '';
     if (t.isEmpty) return 'Password wajib diisi';
-    if (t.length < 8) return 'Minimal 8 karakter';
-    if (t.length > 72) return 'Maksimal 72 karakter'; // batas input bcrypt
-    if (!RegExp(r'[A-Za-z]').hasMatch(t)) return 'Harus mengandung huruf';
-    if (!RegExp(r'[0-9]').hasMatch(t)) return 'Harus mengandung angka';
+    if (t.length < 6) return 'Minimal 6 karakter';
+    if (t.length > 64) return 'Maksimal 64 karakter';
+    if (!RegExp(r'^[A-Za-z0-9]+$').hasMatch(t)) return 'Hanya huruf dan angka (tanpa spasi atau simbol)';
     return null;
   }
 

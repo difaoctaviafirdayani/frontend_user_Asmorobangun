@@ -114,7 +114,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _goRegister() async {
-    final ok = await Navigator.pushNamed<bool>(context, Routes.register);
+    FocusScope.of(context).unfocus();
+    final ok = await Navigator.of(context, rootNavigator: true).push<bool>(
+      MaterialPageRoute(settings: const RouteSettings(name: Routes.register), builder: (_) => const RegisterScreen()),
+    );
     if (ok == true && mounted) _onSuccess();
   }
 
@@ -274,8 +277,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               enableSuggestions: false,
               autocorrect: false,
               textInputAction: TextInputAction.next,
-              inputFormatters: InputFormats.maxLen(72),
-              decoration: inputDec('Password', hint: 'Min. 8 karakter, huruf dan angka').copyWith(
+              inputFormatters: InputFormats.maxLen(64),
+              decoration: inputDec('Password', hint: '6-64 karakter, hanya huruf dan angka').copyWith(
                 suffixIcon: IconButton(
                   icon: Icon(_hide ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                   onPressed: () => setState(() => _hide = !_hide),

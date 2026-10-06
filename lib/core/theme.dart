@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
   static const wood950 = Color(0xFF241609);
@@ -32,10 +33,10 @@ ThemeData buildTheme() {
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.canvas,
-    textTheme: ThemeData.light().textTheme.apply(
-          bodyColor: AppColors.ink,
-          displayColor: AppColors.wood900,
-        ),
+    textTheme: GoogleFonts.poppinsTextTheme(ThemeData.light().textTheme).apply(
+      bodyColor: AppColors.ink,
+      displayColor: AppColors.wood900,
+    ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.wood800,
@@ -78,3 +79,5 @@ InputDecoration inputDec(String label, {String? hint}) {
     labelStyle: const TextStyle(color: AppColors.inkSoft),
   );
 }
+TextStyle headingStyle({double size = 24, Color color = AppColors.wood700, FontWeight? weight}) =>
+    GoogleFonts.itim(fontSize: size, color: color, fontWeight: weight, height: 1.15);

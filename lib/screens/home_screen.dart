@@ -13,9 +13,11 @@ import 'gallery_screen.dart';
 import 'search_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  /// Pindah tab dari shell: 1 = Fasilitas, 2 = Forum.
+  /// Pindah tab dari shell: 1 = Fasilitas, 2 = Forum, 4 = Akun.
   final ValueChanged<int> onNavigate;
   const HomeScreen({super.key, required this.onNavigate});
+
+  static const double _pad = 20;
 
   void _push(BuildContext context, Widget page) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => page));
@@ -23,52 +25,75 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.wood900,
-        foregroundColor: AppColors.cream100,
-        elevation: 0,
-        title: Image.asset('assets/images/logo-gold.png', height: 30),
-        actions: [searchAction(context)],
-      ),
-      body: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: NetImage(
-            src: '/uploads/site_images/sanggar-utama.jpg',
-            height: 170,
-            width: double.infinity,
-            radius: BorderRadius.circular(16),
-          ),
-        ),
-        SectionHeader('Berita & pengumuman', onSeeAll: () => _push(context, const AnnouncementsScreen())),
-        _announcements(context),
-        SectionHeader('Artikel terbaru', onSeeAll: () => _push(context, const ArticlesScreen())),
-        _featuredArticle(context),
-        SectionHeader('Layanan sanggar', onSeeAll: () => onNavigate(1)),
-        _facilities(context),
-        SectionHeader('Galeri sanggar', onSeeAll: () => _push(context, const GalleryScreen())),
-        _gallery(context),
-        const SectionHeader('Lokasi sanggar'),
-        _location(context),
-        const SectionHeader('Forum diskusi'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: AppCard(
-            child: Column(children: [
-              const Text(
-                'Punya pertanyaan atau mau berbagi pengalaman soal sanggar? Gabung diskusi warga dan alumni kelas di sini.',
-                textAlign: TextAlign.center,
+      backgroundColor: Colors.white,
+      body: Column(children: [
+        _header(context),
+        Expanded(
+          child: ListView(padding: const EdgeInsets.only(bottom: 28), children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(_pad, 16, _pad, 0),
+              child: NetImage(
+                src: 'sanggar-utama.jpg',
+                height: 220,
+                width: double.infinity,
+                radius: BorderRadius.circular(20),
               ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () => onNavigate(2),
-                icon: const Icon(Icons.forum_outlined),
-                label: const Text('Masuk ke Forum'),
-              ),
-            ]),
-          ),
+            ),
+            _SectionTitle('Pengumuman', actionLabel: 'Lihat semua', onAction: () => _push(context, const AnnouncementsScreen())),
+            _announcements(context),
+            _SectionTitle('Berita dan Artikel', actionLabel: 'Lihat semua', onAction: () => _push(context, const ArticlesScreen())),
+            _featuredArticle(context),
+            _SectionTitle('Layanan Sanggar', actionLabel: 'Lihat semua', onAction: () => onNavigate(1)),
+            _facilities(context),
+            _SectionTitle('Galeri Sanggar', actionLabel: 'Lihat semua', onAction: () => _push(context, const GalleryScreen())),
+            _gallery(context),
+            const _SectionTitle('Lokasi Kami'),
+            _location(context),
+            _SectionTitle('Forum Diskusi', actionLabel: 'Buka Forum', onAction: () => onNavigate(2)),
+            _forum(),
+          ]),
         ),
       ]),
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    return Container(
+      color: AppColors.wood900,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(_pad, 10, _pad, 16),
+          child: Column(children: [
+            Row(children: [
+              Image.asset('assets/images/logo-gold.png', height: 30),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Akun',
+                icon: const Icon(Icons.person_outline_rounded, color: AppColors.cream100, size: 28),
+                onPressed: () => onNavigate(4),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Material(
+              color: Colors.white.withAlpha(60),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _push(context, const SearchScreen()),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.search_rounded, color: Colors.white, size: 22),
+                    SizedBox(width: 8),
+                    Text('Telusuri lebih lanjut', style: TextStyle(color: Colors.white, fontSize: 15)),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -77,30 +102,34 @@ class HomeScreen extends StatelessWidget {
       loader: () async => mapList((await api.get('/announcements'))['announcements'], Announcement.fromJson),
       builder: (context, items, _) {
         if (items.isEmpty) return const EmptyState('Belum ada pengumuman.');
+        final shown = items.length > 8 ? 8 : items.length;
         return SizedBox(
-          height: 218,
+          height: 250,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: items.length > 8 ? 8 : items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            padding: const EdgeInsets.symmetric(horizontal: _pad),
+            itemCount: shown,
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
             itemBuilder: (context, i) {
               final a = items[i];
               return SizedBox(
-                width: 230,
-                child: AppCard(
+                width: 300,
+                child: _CreamCard(
                   padding: EdgeInsets.zero,
                   onTap: () => _push(context, AnnouncementDetailScreen(item: a)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    NetImage(src: a.image ?? 'sanggar-tari.jpg', height: 104, width: double.infinity),
+                    NetImage(src: a.image ?? 'sanggar-tari.jpg', height: 130, width: double.infinity),
                     Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        TagChip(a.type, gold: true),
-                        const SizedBox(height: 6),
-                        Text(a.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        _BrownChip(a.type),
+                        const SizedBox(height: 8),
+                        Text(a.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.wood700, fontSize: 14)),
                         const SizedBox(height: 2),
-                        Text(formatDate(a.date), style: const TextStyle(fontSize: 12, color: AppColors.inkSoft)),
+                        Text(formatDateLong(a.date), style: const TextStyle(color: AppColors.wood700, fontSize: 13)),
                       ]),
                     ),
                   ]),
@@ -122,22 +151,19 @@ class HomeScreen extends StatelessWidget {
       builder: (context, a, _) {
         if (a == null) return const EmptyState('Belum ada artikel.');
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: AppCard(
-            padding: EdgeInsets.zero,
+          padding: const EdgeInsets.symmetric(horizontal: _pad),
+          child: _CreamCard(
+            padding: const EdgeInsets.all(16),
             onTap: () => _push(context, ArticleDetailScreen(slug: a.slug)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              NetImage(src: a.image, height: 155, width: double.infinity),
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  TagChip(a.category, gold: true),
-                  const SizedBox(height: 8),
-                  Text(a.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(a.excerpt, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
-                ]),
-              ),
+              _BrownChip(a.category),
+              const SizedBox(height: 10),
+              Text(a.title, style: headingStyle(size: 20)),
+              const SizedBox(height: 6),
+              Text(a.excerpt,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.wood700, fontSize: 14, height: 1.45)),
             ]),
           ),
         );
@@ -148,13 +174,16 @@ class HomeScreen extends StatelessWidget {
   Widget _facilities(BuildContext context) {
     return AsyncView<List<Facility>>(
       loader: () async => mapList((await api.get('/facilities'))['facilities'], Facility.fromJson),
-      builder: (context, items, _) => Column(children: [
-        for (final f in items)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: FacilityTile(facility: f),
-          ),
-      ]),
+      builder: (context, items, _) {
+        if (items.isEmpty) return const EmptyState('Belum ada layanan.');
+        final shown = items.take(2).toList();
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _pad),
+          child: Column(children: [
+            for (final f in shown) _FacilityRow(facility: f, onTap: () => _push(context, FacilityDetailScreen(id: f.id))),
+          ]),
+        );
+      },
     );
   }
 
@@ -164,29 +193,21 @@ class HomeScreen extends StatelessWidget {
       builder: (context, items, _) {
         if (items.isEmpty) return const EmptyState('Belum ada foto galeri.');
         return SizedBox(
-          height: 170,
+          height: 210,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: _pad),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) {
-              final g = items[i];
-              return SizedBox(
-                width: 210,
-                child: AppCard(
-                  padding: EdgeInsets.zero,
-                  onTap: () => _push(context, const GalleryScreen()),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    NetImage(src: g.image, height: 105, width: double.infinity),
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Text(g.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    ),
-                  ]),
-                ),
-              );
-            },
+            separatorBuilder: (_, __) => const SizedBox(width: 14),
+            itemBuilder: (context, i) => GestureDetector(
+              onTap: () => _push(context, const GalleryScreen()),
+              child: NetImage(
+                src: items[i].image,
+                width: 300,
+                height: 210,
+                radius: BorderRadius.circular(20),
+              ),
+            ),
           ),
         );
       },
@@ -194,31 +215,173 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _location(BuildContext context) {
+    const underline = TextStyle(decoration: TextDecoration.underline, fontSize: 13.5, fontWeight: FontWeight.w600);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: _pad),
+      child: _CreamCard(
+        padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text(AppConfig.sanggarName, style: TextStyle(fontWeight: FontWeight.w700)),
+          Text(AppConfig.sanggarName, style: headingStyle(size: 22)),
           const SizedBox(height: 4),
-          const Text(AppConfig.sanggarAddress, style: TextStyle(color: AppColors.inkSoft)),
+          const Text(AppConfig.sanggarAddress, style: TextStyle(color: AppColors.wood700, fontSize: 14, height: 1.4)),
           const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => openUrl(context, AppConfig.mapsUrl),
+            child: NetImage(src: 'peta-lokasi.jpg', height: 150, width: double.infinity, radius: BorderRadius.circular(18)),
+          ),
+          const SizedBox(height: 14),
           Row(children: [
             Expanded(
-              child: OutlinedButton.icon(
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.wood700,
+                  side: const BorderSide(color: AppColors.wood700, width: 1.3),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                ),
                 onPressed: () => openUrl(context, AppConfig.mapsUrl),
-                icon: const Icon(Icons.map_outlined, size: 18),
-                label: const Text('Buka Maps'),
+                child: const FittedBox(fit: BoxFit.scaleDown, child: Text('Buka di Google Maps', style: underline)),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: ElevatedButton.icon(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.wood700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                ),
                 onPressed: () => openUrl(context, waUrl()),
-                icon: const Icon(Icons.chat_outlined, size: 18),
-                label: const Text('WhatsApp'),
+                child: const FittedBox(fit: BoxFit.scaleDown, child: Text('WhatsApp Admin', style: underline)),
               ),
             ),
           ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _forum() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _pad),
+      child: _CreamCard(
+        padding: const EdgeInsets.all(18),
+        child: Column(children: [
+          const Text(
+            'Punya pertanyaan atau ingin berbagi pengalaman tentang Sanggar Asmorobangun? Gabunglah di forum diskusi kami!',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.wood700, fontSize: 15, height: 1.45),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.wood700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => onNavigate(2),
+              child: const Text('Masuk ke Forum', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  const _SectionTitle(this.title, {this.actionLabel, this.onAction});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(HomeScreen._pad, 22, HomeScreen._pad, 10),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Expanded(child: Text(title, style: headingStyle(size: 26))),
+          if (actionLabel != null)
+            InkWell(
+              onTap: onAction,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(actionLabel!, style: const TextStyle(color: AppColors.wood700, fontSize: 14.5)),
+              ),
+            ),
+        ]),
+      );
+}
+
+class _CreamCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+  const _CreamCard({required this.child, required this.padding, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Material(
+        color: AppColors.cream100,
+        child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+      ),
+    );
+  }
+}
+
+class _BrownChip extends StatelessWidget {
+  final String text;
+  const _BrownChip(this.text);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(color: AppColors.wood700, borderRadius: BorderRadius.circular(999)),
+        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+      );
+}
+
+class _FacilityRow extends StatelessWidget {
+  final Facility facility;
+  final VoidCallback onTap;
+  const _FacilityRow({required this.facility, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final f = facility;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.wood700, width: 1))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          NetImage(src: f.image, width: 116, height: 86, radius: BorderRadius.circular(8)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                  child: Text(f.name.replaceAll(RegExp(r'\s*\(.*\)'), ''),
+                      maxLines: 2, overflow: TextOverflow.ellipsis, style: headingStyle(size: 17)),
+                ),
+                if (f.avgRating != null) ...[
+                  const Icon(Icons.star_border_rounded, color: AppColors.gold400, size: 20),
+                  const SizedBox(width: 2),
+                  Text(f.avgRating!.toStringAsFixed(1), style: const TextStyle(color: AppColors.wood700, fontSize: 13)),
+                ],
+              ]),
+              const SizedBox(height: 4),
+              Text(f.shortDesc,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.wood700, fontSize: 13, height: 1.35)),
+            ]),
+          ),
         ]),
       ),
     );

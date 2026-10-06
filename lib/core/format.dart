@@ -24,6 +24,15 @@ String formatDate(String? iso) {
   final l = d.toLocal();
   return '${l.day} ${_months[l.month - 1]} ${l.year}';
 }
+const _monthsLong = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+String formatDateLong(String? iso) {
+  if (iso == null || iso.isEmpty) return '';
+  final d = DateTime.tryParse(iso);
+  if (d == null) return iso;
+  final l = d.toLocal();
+  return '${l.day} ${_monthsLong[l.month - 1]} ${l.year}';
+}
 
 String dateParam(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
