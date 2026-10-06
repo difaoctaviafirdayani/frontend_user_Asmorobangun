@@ -79,5 +79,8 @@ InputDecoration inputDec(String label, {String? hint}) {
     labelStyle: const TextStyle(color: AppColors.inkSoft),
   );
 }
-TextStyle headingStyle({double size = 24, Color color = AppColors.wood700, FontWeight? weight}) =>
-    GoogleFonts.itim(fontSize: size, color: color, fontWeight: weight, height: 1.15);
+TextStyle headingStyle({double size = 24, Color color = AppColors.wood700}) =>
+    GoogleFonts.margarine(fontSize: size, color: color, height: 1.15);
+
+TextStyle logoStyle({double size = 30, Color color = AppColors.gold300}) =>
+    TextStyle(fontFamily: 'Upakarti', fontSize: size, color: color, height: 1.1);

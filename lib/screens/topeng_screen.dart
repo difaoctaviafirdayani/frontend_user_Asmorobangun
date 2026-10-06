@@ -42,7 +42,7 @@ class TopengScreen extends StatelessWidget {
               crossAxisCount: 2,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 0.68,
+              mainAxisExtent: 285,
             ),
             itemCount: items.length,
             itemBuilder: (context, i) {
@@ -101,10 +101,7 @@ class _TopengBody extends StatefulWidget {
 class _TopengBodyState extends State<_TopengBody> {
   final _formKey = GlobalKey<FormState>();
   int _qty = 1;
-  bool _custom = false;
   bool _busy = false;
-  final _customName = TextEditingController();
-  final _customDesign = TextEditingController();
   final _phone = TextEditingController();
   final _message = TextEditingController();
 
@@ -116,7 +113,7 @@ class _TopengBodyState extends State<_TopengBody> {
 
   @override
   void dispose() {
-    for (final c in [_customName, _customDesign, _phone, _message]) {
+    for (final c in [_phone, _message]) {
       c.dispose();
     }
     super.dispose();
@@ -136,8 +133,6 @@ class _TopengBodyState extends State<_TopengBody> {
       // jadi aplikasi hanya mengirim jumlah, bukan total.
       final res = await api.post('/topeng/${widget.topeng.id}/order', body: {
         'qty': _qty,
-        'customName': _custom ? Validators.clean(_customName.text) : null,
-        'customDesign': _custom ? Validators.clean(_customDesign.text) : null,
         'buyerPhone': _phone.text.replaceAll(RegExp(r'[\s\-]'), ''),
         'message': Validators.clean(_message.text),
       });
@@ -176,79 +171,49 @@ class _TopengBodyState extends State<_TopengBody> {
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Text('Jumlah', style: TextStyle(fontWeight: FontWeight.w600)),
-            const Spacer(),
-            IconButton.outlined(
-              onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
-              icon: const Icon(Icons.remove),
-            ),
-            SizedBox(width: 40, child: Text('$_qty', textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
-            IconButton.outlined(
-              onPressed: _qty < widget.topeng.stock ? () => setState(() => _qty++) : null,
-              icon: const Icon(Icons.add),
-            ),
-          ]),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text('Total ${formatRupiah(t.price * _qty)}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.wood800)),
-          ),
-          const SizedBox(height: 6),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            activeColor: AppColors.gold400,
-            title: const Text('Request nama/desain custom'),
-            value: _custom,
-            onChanged: (v) => setState(() => _custom = v),
-          ),
-          if (_custom) ...[
-            TextFormField(
-              controller: _customName,
-              inputFormatters: InputFormats.maxLen(60),
-              decoration: inputDec('Nama custom', hint: 'Untuk diukir atau label'),
-              validator: Validators.text('Nama custom', min: 2, max: 60, required: false),
+            Row(children: [
+              const Text('Jumlah', style: TextStyle(fontWeight: FontWeight.w600)),
+              const Spacer(),
+              IconButton.outlined(
+                onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
+                icon: const Icon(Icons.remove),
+              ),
+              SizedBox(width: 40, child: Text('$_qty', textAlign: TextAlign.center, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
+              IconButton.outlined(
+                onPressed: _qty < widget.topeng.stock ? () => setState(() => _qty++) : null,
+                icon: const Icon(Icons.add),
+              ),
+            ]),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('Total ${formatRupiah(t.price * _qty)}', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.wood800)),
             ),
             const SizedBox(height: 10),
             TextFormField(
-              controller: _customDesign,
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              inputFormatters: InputFormats.phone,
+              decoration: inputDec('Nomor WhatsApp kamu', hint: '08xxxxxxxxxx'),
+              validator: (v) => Validators.phone(v, required: true),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _message,
               maxLines: 2,
               inputFormatters: InputFormats.maxLen(300),
-              decoration: inputDec('Detail desain custom', hint: 'Warna, karakter, detail yang diinginkan'),
-              validator: (v) {
-                // Bila mode custom aktif, minimal salah satu dari nama atau desain harus terisi.
-                if ((v ?? '').trim().isEmpty && _customName.text.trim().isEmpty) {
-                  return 'Isi nama atau detail desain custom';
-                }
-                return Validators.text('Detail desain', min: 3, max: 300, required: false)(v);
-              },
+              decoration: inputDec('Catatan tambahan', hint: 'Pesan untuk admin (opsional)'),
+              validator: Validators.text('Catatan', max: 300, required: false),
             ),
-            const SizedBox(height: 10),
-          ],
-          TextFormField(
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            inputFormatters: InputFormats.phone,
-            decoration: inputDec('Nomor WhatsApp kamu', hint: '08xxxxxxxxxx'),
-            validator: (v) => Validators.phone(v, required: true),
-          ),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _message,
-            maxLines: 2,
-            inputFormatters: InputFormats.maxLen(300),
-            decoration: inputDec('Catatan tambahan', hint: 'Pesan untuk admin (opsional)'),
-            validator: Validators.text('Catatan', max: 300, required: false),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _busy ? null : _order,
-              icon: const Icon(Icons.shopping_bag_outlined),
-              label: Text(_busy ? 'Memproses...' : 'Pesan & Lanjut Pembayaran'),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _busy ? null : _order,
+                icon: const Icon(Icons.shopping_bag_outlined),
+                label: Text(_busy ? 'Memproses...' : 'Pesan & Lanjut Pembayaran'),
+              ),
             ),
-          ),
-        ]),
+          ]),
         ),
       ),
     ]);

@@ -66,7 +66,7 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(_pad, 10, _pad, 16),
           child: Column(children: [
             Row(children: [
-              Image.asset('assets/images/logo-gold.png', height: 30),
+              Text('asmorobangun', style: logoStyle(size: 30)),
               const Spacer(),
               IconButton(
                 tooltip: 'Akun',
@@ -370,7 +370,7 @@ class _FacilityRow extends StatelessWidget {
                       maxLines: 2, overflow: TextOverflow.ellipsis, style: headingStyle(size: 17)),
                 ),
                 if (f.avgRating != null) ...[
-                  const Icon(Icons.star_border_rounded, color: AppColors.gold400, size: 20),
+                  const Icon(Icons.star_rounded, color: AppColors.gold400, size: 20),
                   const SizedBox(width: 2),
                   Text(f.avgRating!.toStringAsFixed(1), style: const TextStyle(color: AppColors.wood700, fontSize: 13)),
                 ],

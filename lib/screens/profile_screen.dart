@@ -19,6 +19,7 @@ class ProfileScreen extends StatelessWidget {
     if (!auth.isLoggedIn) return const LoginScreen(embedded: true);
     return Scaffold(
       appBar: AppBar(
+        leading: appBarBack(context),
         title: const Text('Akun', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         backgroundColor: AppColors.wood900,
         foregroundColor: AppColors.cream100,

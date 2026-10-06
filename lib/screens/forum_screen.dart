@@ -45,7 +45,8 @@ class _ForumScreenState extends State<ForumScreen> {
   Future<void> _newThread() async {
     // Lapisan 3: autentikasi sebelum membuat diskusi
     if (!await ensureLogin(context)) return;
-    final created = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => const NewThreadScreen()));
+    if (!mounted) return;
+    final created = await showNewThreadSheet(context);
     if (created == true) _refresh();
   }
 
@@ -134,14 +135,26 @@ class _ForumScreenState extends State<ForumScreen> {
   }
 }
 
-class NewThreadScreen extends StatefulWidget {
-  const NewThreadScreen({super.key});
-
-  @override
-  State<NewThreadScreen> createState() => _NewThreadScreenState();
+/// Bottom sheet "Mulai Diskusi Baru" (sesuai desain Figma).
+/// Muncul di atas halaman forum, bar navigasi bawah tetap terlihat.
+Future<bool?> showNewThreadSheet(BuildContext context) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const NewThreadSheet(),
+  );
 }
 
-class _NewThreadScreenState extends State<NewThreadScreen> {
+class NewThreadSheet extends StatefulWidget {
+  const NewThreadSheet({super.key});
+
+  @override
+  State<NewThreadSheet> createState() => _NewThreadSheetState();
+}
+
+class _NewThreadSheetState extends State<NewThreadSheet> {
   final _form = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _content = TextEditingController();
@@ -177,50 +190,117 @@ class _NewThreadScreenState extends State<NewThreadScreen> {
     }
   }
 
+  InputDecoration _dec(String hint) {
+    OutlineInputBorder border(Color c, [double w = 1.5]) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: c, width: w),
+        );
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: AppColors.inkSoft),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: border(AppColors.wood800),
+      enabledBorder: border(AppColors.wood800),
+      focusedBorder: border(AppColors.gold400, 2),
+      errorBorder: border(AppColors.danger),
+      focusedErrorBorder: border(AppColors.danger, 2),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text, style: const TextStyle(fontSize: 16, color: AppColors.wood900)),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return AppScaffold(
-      title: 'Diskusi baru',
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _form,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: Column(children: [
-            FutureBuilder<List<String>>(
-              future: _categories,
-              builder: (context, snap) {
-                final cats = snap.data ?? _defaultCategories;
-                if (!cats.contains(_category)) _category = cats.first;
-                return DropdownButtonFormField<String>(
-                  value: _category,
-                  decoration: inputDec('Kategori'),
-                  items: [for (final c in cats) DropdownMenuItem(value: c, child: Text(c))],
-                  onChanged: (v) => setState(() => _category = v ?? _category),
-                );
-              },
+    // Sheet naik mengikuti keyboard.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboard),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFDFAE8),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          border: Border.all(color: AppColors.wood800),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+          child: Form(
+            key: _form,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Mulai Diskusi Baru', style: headingStyle(size: 28, color: AppColors.wood800)),
+                const SizedBox(height: 18),
+                _label('Kategori'),
+                FutureBuilder<List<String>>(
+                  future: _categories,
+                  builder: (context, snap) {
+                    final cats = snap.data ?? _defaultCategories;
+                    if (!cats.contains(_category)) _category = cats.first;
+                    return DropdownButtonFormField<String>(
+                      value: _category,
+                      isExpanded: true,
+                      decoration: _dec(''),
+                      borderRadius: BorderRadius.circular(16),
+                      dropdownColor: Colors.white,
+                      items: [for (final c in cats) DropdownMenuItem(value: c, child: Text(c))],
+                      onChanged: (v) => setState(() => _category = v ?? _category),
+                    );
+                  },
+                ),
+                const SizedBox(height: 14),
+                _label('Judul'),
+                TextFormField(
+                  controller: _title,
+                  inputFormatters: InputFormats.maxLen(120),
+                  decoration: _dec('Judul diskusi'),
+                  validator: Validators.text('Judul', min: 5, max: 120),
+                ),
+                const SizedBox(height: 14),
+                _label('Pertanyaan'),
+                TextFormField(
+                  controller: _content,
+                  minLines: 4,
+                  maxLines: 6,
+                  inputFormatters: InputFormats.maxLen(2000),
+                  decoration: _dec('Tulis pertanyaan Anda di sini...'),
+                  validator: Validators.text('Pertanyaan', min: 10, max: 2000),
+                ),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _busy ? null : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFDFAE8),
+                        side: const BorderSide(color: AppColors.wood800, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Batal', style: TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _busy ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text(_busy ? 'Mengirim...' : 'Kirim', style: const TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                ]),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _title,
-              inputFormatters: InputFormats.maxLen(120),
-              decoration: inputDec('Judul'),
-              validator: Validators.text('Judul', min: 5, max: 120),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _content,
-              maxLines: 8,
-              inputFormatters: InputFormats.maxLen(2000),
-              decoration: inputDec('Isi diskusi'),
-              validator: Validators.text('Isi diskusi', min: 10, max: 2000),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Mengirim...' : 'Posting')),
-            ),
-          ]),
+          ),
         ),
       ),
     );

@@ -18,14 +18,14 @@ class FacilitiesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'Fasilitas & Layanan',
+      title: 'Layanan Sanggar',
       actions: [searchAction(context)],
       body: AsyncView<List<Facility>>(
         loader: () async => mapList((await api.get('/facilities'))['facilities'], Facility.fromJson),
         builder: (context, items, _) => ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, __) => const SizedBox(height: 14),
           itemBuilder: (context, i) => FacilityTile(facility: items[i]),
         ),
       ),
@@ -40,27 +40,44 @@ class FacilityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final f = facility;
-    return AppCard(
-      padding: const EdgeInsets.all(12),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacilityDetailScreen(id: f.id))),
-      child: Row(children: [
-        NetImage(src: f.image, width: 64, height: 64, radius: BorderRadius.circular(12)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(f.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(f.shortDesc, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
+    final radius = BorderRadius.circular(20);
+    return Material(
+      color: const Color(0xFFFDFAE8),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: const BorderSide(color: AppColors.wood800, width: 1.2),
+      ),
+      child: InkWell(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacilityDetailScreen(id: f.id))),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            NetImage(src: f.image, width: 130, height: 100, radius: BorderRadius.circular(10)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: Text(f.name, style: headingStyle(size: 16))),
+                  if (f.avgRating != null) ...[
+                    const SizedBox(width: 6),
+                    const Icon(Icons.star_rounded, color: AppColors.gold400, size: 20),
+                    const SizedBox(width: 2),
+                    Text(f.avgRating!.toStringAsFixed(1), style: const TextStyle(color: AppColors.wood700, fontSize: 13)),
+                  ],
+                ]),
+                const SizedBox(height: 4),
+                Text(
+                  f.shortDesc,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.wood700, fontSize: 13, height: 1.35),
+                ),
+              ]),
+            ),
           ]),
         ),
-        if (f.avgRating != null) ...[
-          const SizedBox(width: 8),
-          Column(children: [
-            const Icon(Icons.star_rounded, color: AppColors.gold400, size: 18),
-            Text('${f.avgRating}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-          ]),
-        ],
-      ]),
+      ),
     );
   }
 }
@@ -78,7 +95,7 @@ class FacilityDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'Detail layanan',
+      title: 'Detail Layanan',
       body: AsyncView<_FacilityData>(
         loader: () async {
           final res = await api.get('/facilities/$id');
@@ -224,16 +241,19 @@ class _ReviewFormState extends State<ReviewForm> {
                     style: TextStyle(color: AppColors.inkSoft, fontSize: 13)),
               ),
             const Text('Rating kamu', style: TextStyle(fontWeight: FontWeight.w600)),
-            Row(children: [
-              for (var n = 1; n <= 5; n++)
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => setState(() => _rating = n),
-                  icon: Icon(Icons.star_rounded, size: 30, color: n <= _rating ? AppColors.gold400 : AppColors.cream300),
-                ),
-              const SizedBox(width: 6),
-              Text('$_rating - ${_ratingLabels[_rating]}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
-            ]),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (var n = 1; n <= 5; n++)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => setState(() => _rating = n),
+                    icon: Icon(Icons.star_rounded, size: 30, color: n <= _rating ? AppColors.gold400 : AppColors.cream300),
+                  ),
+                const SizedBox(width: 6),
+                Text('$_rating - ${_ratingLabels[_rating]}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
+              ],
+            ),
             TextFormField(
               controller: _comment,
               maxLines: 3,

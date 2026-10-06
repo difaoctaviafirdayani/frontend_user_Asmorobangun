@@ -40,6 +40,25 @@ Future<bool> confirmDialog(BuildContext context, String message, {String okLabel
   return res == true;
 }
 
+class ShellScope extends InheritedWidget {
+  final VoidCallback goHome;
+  const ShellScope({super.key, required this.goHome, required super.child});
+
+  @override
+  bool updateShouldNotify(ShellScope oldWidget) => false;
+}
+
+Widget? appBarBack(BuildContext context) {
+  if (Navigator.canPop(context)) return null;
+  final shell = context.dependOnInheritedWidgetOfExactType<ShellScope>();
+  if (shell == null) return null;
+  return IconButton(
+    tooltip: 'Kembali',
+    icon: const Icon(Icons.arrow_back),
+    onPressed: shell.goHome,
+  );
+}
+
 /// Scaffold standar halaman dalam dengan app bar coklat tua.
 class AppScaffold extends StatelessWidget {
   final String title;
@@ -52,7 +71,8 @@ class AppScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        leading: appBarBack(context),
+        title: Text(title, style: headingStyle(size: 22, color: AppColors.cream100)),
         backgroundColor: AppColors.wood900,
         foregroundColor: AppColors.cream100,
         elevation: 0,

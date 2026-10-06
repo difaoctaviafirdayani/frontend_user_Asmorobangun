@@ -28,7 +28,7 @@ class _AuthHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
           decoration: BoxDecoration(color: AppColors.wood900, borderRadius: BorderRadius.circular(16)),
-          child: Image.asset('assets/images/logo-gold.png', height: 42),
+          child: Text('asmorobangun', style: logoStyle(size: 36)),
         ),
         const SizedBox(height: 18),
         Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.wood900)),

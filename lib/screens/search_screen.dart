@@ -54,6 +54,7 @@ class _SearchScreenState extends State<SearchScreen> {
       });
       return;
     }
+    setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 350), () => _search(q));
   }
 
@@ -118,7 +119,7 @@ class _SearchScreenState extends State<SearchScreen> {
           style: const TextStyle(color: AppColors.cream100),
           cursorColor: AppColors.gold300,
           decoration: const InputDecoration(
-            hintText: 'Cari artikel, kelas, topeng, forum...',
+            hintText: 'Cari Fitur yang Kamu Inginkan',
             hintStyle: TextStyle(color: AppColors.gold300),
             border: InputBorder.none,
           ),

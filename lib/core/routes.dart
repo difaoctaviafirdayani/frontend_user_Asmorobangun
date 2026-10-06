@@ -50,7 +50,7 @@ class AppRouter {
 
     switch (name) {
       case Routes.home:
-        return _page(settings, const AppShell());
+        return _page(settings, AppShell(onGenerateRoute: onGenerateRoute, onUnknownRoute: onUnknownRoute));
       case Routes.login:
         return _page(settings, const LoginScreen());
       case Routes.register:
@@ -59,14 +59,16 @@ class AppRouter {
         return _page(settings, const MyOrdersScreen());
       case Routes.order:
         final id = settings.arguments;
-        if (id is String && id.isNotEmpty) return _page(settings, OrderDetailScreen(orderId: id));
+        if (id is String && id.isNotEmpty)
+          return _page(settings, OrderDetailScreen(orderId: id));
         return _page(settings, const _NotFoundScreen());
       default:
         return _page(settings, const _NotFoundScreen());
     }
   }
 
-  Route<dynamic> onUnknownRoute(RouteSettings settings) => _page(settings, const _NotFoundScreen());
+  Route<dynamic> onUnknownRoute(RouteSettings settings) =>
+      _page(settings, const _NotFoundScreen());
 
   static MaterialPageRoute<T> _page<T>(RouteSettings settings, Widget child) =>
       MaterialPageRoute<T>(settings: settings, builder: (_) => child);
@@ -78,7 +80,8 @@ class _ForbiddenScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const AppScaffold(
         title: 'Akses ditolak',
-        body: EmptyState('Akunmu tidak punya izin untuk membuka halaman ini.', icon: Icons.lock_outline_rounded),
+        body: EmptyState('Akunmu tidak punya izin untuk membuka halaman ini.',
+            icon: Icons.lock_outline_rounded),
       );
 }
 
@@ -88,6 +91,7 @@ class _NotFoundScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const AppScaffold(
         title: 'Tidak ditemukan',
-        body: EmptyState('Halaman yang kamu cari tidak ada.', icon: Icons.search_off_rounded),
+        body: EmptyState('Halaman yang kamu cari tidak ada.',
+            icon: Icons.search_off_rounded),
       );
 }
