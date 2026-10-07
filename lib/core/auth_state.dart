@@ -90,6 +90,40 @@ class AuthState extends ChangeNotifier {
     await _setSession(res);
   }
 
+  /// LUPA PASSWORD. Email dan nomor HP harus cocok dengan data saat daftar.
+  /// Tidak membuat sesi login: setelah berhasil, pengguna login dengan password baru.
+  /// Mengembalikan pesan sukses dari server untuk ditampilkan sebagai notifikasi.
+  Future<String> resetPassword({
+    required String email,
+    required String phone,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    final res = await api.post('/auth/reset-password', body: {
+      'email': email,
+      'phone': phone,
+      'newPassword': newPassword,
+      'confirmPassword': confirmPassword,
+    });
+    return (res['message'] as String?) ?? 'Password berhasil diganti. Silakan login dengan password baru.';
+  }
+
+  /// GANTI PASSWORD saat sudah login. Server memberi token baru, jadi perangkat ini
+  /// tetap login sedangkan perangkat lain otomatis keluar.
+  Future<String> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    final res = await api.post('/auth/change-password', body: {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+      'confirmPassword': confirmPassword,
+    });
+    await _setSession(res);
+    return (res['message'] as String?) ?? 'Password berhasil diganti.';
+  }
+
   Future<void> _setSession(Map<String, dynamic> res) async {
     token = res['token'] as String;
     user = AppUser.fromJson(res['user'] as Map<String, dynamic>);

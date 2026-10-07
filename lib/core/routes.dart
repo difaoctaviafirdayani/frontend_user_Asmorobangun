@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../screens/auth_screens.dart';
+import '../screens/forgot_password_screen.dart';
 import '../screens/my_orders_screen.dart';
 import '../screens/shell.dart';
 import '../screens/topeng_screen.dart';
@@ -13,6 +14,7 @@ class Routes {
   static const home = '/';
   static const login = '/login';
   static const register = '/register';
+  static const forgotPassword = '/forgot-password'; // arguments (opsional): String email
   static const myOrders = '/my-orders'; // butuh login
   static const order = '/order'; // butuh login, arguments: String orderId
 }
@@ -55,6 +57,9 @@ class AppRouter {
         return _page(settings, const LoginScreen());
       case Routes.register:
         return _page(settings, const RegisterScreen());
+      case Routes.forgotPassword:
+        final email = settings.arguments;
+        return _page(settings, ForgotPasswordScreen(initialEmail: email is String ? email : null));
       case Routes.myOrders:
         return _page(settings, const MyOrdersScreen());
       case Routes.order:

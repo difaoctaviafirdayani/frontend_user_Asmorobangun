@@ -40,7 +40,12 @@ class _ForumScreenState extends State<ForumScreen> {
     return mapList((await api.get('/forum', query: q))['threads'], ThreadSummary.fromJson);
   }
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() {
+  final future = _load();
+  setState(() {
+    _future = future;
+  });
+}
 
   Future<void> _newThread() async {
     // Lapisan 3: autentikasi sebelum membuat diskusi

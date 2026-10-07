@@ -19,6 +19,26 @@ Future<bool> ensureLogin(BuildContext context) async {
   return ok == true;
 }
 
+/// Aturan tambahan khusus layar ini (sama dengan ForgotPasswordScreen dan server).
+final RegExp _alnumRe = RegExp(r'^[A-Za-z0-9]+$');
+
+String? _passwordAlnum(String? v) {
+  final s = v ?? '';
+  if (s.isEmpty) return 'Password wajib diisi.';
+  if (s.length < 6) return 'Password minimal 6 karakter.';
+  if (s.length > 64) return 'Password maksimal 64 karakter.';
+  if (!_alnumRe.hasMatch(s)) {
+    return 'Hanya boleh huruf dan angka (tanpa spasi atau simbol).';
+  }
+  return null;
+}
+
+String? _phoneRequired(String? v) {
+  final digits = (v ?? '').replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return 'Nomor HP wajib diisi.';
+  return null;
+}
+
 class _AuthHeader extends StatelessWidget {
   final String title, subtitle;
   const _AuthHeader(this.title, this.subtitle);
@@ -121,6 +141,14 @@ class _LoginScreenState extends State<LoginScreen> {
     if (ok == true && mounted) _onSuccess();
   }
 
+  void _goForgotPassword() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context, rootNavigator: true).pushNamed(
+      Routes.forgotPassword,
+      arguments: _email.text.trim(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final body = SingleChildScrollView(
@@ -147,13 +175,14 @@ class _LoginScreenState extends State<LoginScreen> {
             autofillHints: const [AutofillHints.password],
             enableSuggestions: false,
             autocorrect: false,
-            decoration: inputDec('Password').copyWith(
+            inputFormatters: InputFormats.maxLen(64),
+            decoration: inputDec('Password', hint: 'Huruf dan angka saja').copyWith(
               suffixIcon: IconButton(
                 icon: Icon(_hide ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                 onPressed: () => setState(() => _hide = !_hide),
               ),
             ),
-            validator: Validators.passwordLogin,
+            validator: _passwordAlnum,
             onFieldSubmitted: (_) => _submit(),
           ),
           const SizedBox(height: 18),
@@ -161,7 +190,11 @@ class _LoginScreenState extends State<LoginScreen> {
             width: double.infinity,
             child: ElevatedButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Masuk...' : 'Masuk')),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
+          TextButton(
+            onPressed: _busy ? null : _goForgotPassword,
+            child: const Text('Lupa password?'),
+          ),
           TextButton(onPressed: _goRegister, child: const Text('Belum punya akun? Daftar')),
         ]),
       ),
@@ -267,8 +300,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               keyboardType: TextInputType.phone,
               textInputAction: TextInputAction.next,
               inputFormatters: InputFormats.phone,
-              decoration: inputDec('Nomor WhatsApp (opsional)', hint: '08xxxxxxxxxx'),
-              validator: Validators.phone,
+              decoration: inputDec('Nomor HP / WhatsApp', hint: '08xxxxxxxxxx'),
+              validator: (v) => _phoneRequired(v) ?? Validators.phone(v),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -284,7 +317,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: () => setState(() => _hide = !_hide),
                 ),
               ),
-              validator: Validators.passwordRegister,
+              validator: _passwordAlnum,
             ),
             const SizedBox(height: 12),
             TextFormField(
