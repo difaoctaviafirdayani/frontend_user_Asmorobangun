@@ -13,7 +13,6 @@ import 'gallery_screen.dart';
 import 'search_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  /// Pindah tab dari shell: 1 = Fasilitas, 2 = Forum, 4 = Akun.
   final ValueChanged<int> onNavigate;
   const HomeScreen({super.key, required this.onNavigate});
 
@@ -116,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                 width: 300,
                 child: _CreamCard(
                   padding: EdgeInsets.zero,
-                  onTap: () => _push(context, AnnouncementDetailScreen(item: a)),
+                  onTap: () => _push(context, const AnnouncementsScreen()),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     NetImage(src: a.image ?? 'sanggar-tari.jpg', height: 130, width: double.infinity),
                     Padding(

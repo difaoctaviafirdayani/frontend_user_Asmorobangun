@@ -19,30 +19,19 @@ class AnnouncementsScreen extends StatelessWidget {
           if (items.isEmpty) return const EmptyState('Belum ada pengumuman.', icon: Icons.campaign_outlined);
           return ListView.separated(
             padding: const EdgeInsets.all(16),
-            itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemCount: items.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, i) {
-              final a = items[i];
-              return AppCard(
-                padding: const EdgeInsets.all(12),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AnnouncementDetailScreen(item: a))),
-                child: Row(children: [
-                  if (a.image != null && a.image!.isNotEmpty) ...[
-                    NetImage(src: a.image, width: 64, height: 64, radius: BorderRadius.circular(12)),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      TagChip(a.type, gold: true),
-                      const SizedBox(height: 6),
-                      Text(a.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text(formatDate(a.date), style: const TextStyle(fontSize: 12, color: AppColors.inkSoft)),
-                    ]),
+              if (i == 0) {
+                return const Padding(
+                  padding: EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'Pengumuman terbaru seputar pendaftaran, jadwal, dan kegiatan Sanggar Asmorobangun.',
+                    style: TextStyle(color: AppColors.wood800, height: 1.4),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: AppColors.inkSoft),
-                ]),
-              );
+                );
+              }
+              return _AnnouncementCard(item: items[i - 1]);
             },
           );
         },
@@ -51,26 +40,33 @@ class AnnouncementsScreen extends StatelessWidget {
   }
 }
 
-class AnnouncementDetailScreen extends StatelessWidget {
+class _AnnouncementCard extends StatelessWidget {
   final Announcement item;
-  const AnnouncementDetailScreen({super.key, required this.item});
+  const _AnnouncementCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    return AppScaffold(
-      title: 'Pengumuman',
-      body: ListView(padding: const EdgeInsets.all(16), children: [
-        if (item.image != null && item.image!.isNotEmpty) ...[
-          NetImage(src: item.image, height: 200, width: double.infinity, radius: BorderRadius.circular(16)),
-          const SizedBox(height: 14),
-        ],
-        Align(alignment: Alignment.centerLeft, child: TagChip(item.type, gold: true)),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cream100,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.wood700),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+          decoration: BoxDecoration(color: AppColors.wood700, borderRadius: BorderRadius.circular(999)),
+          child: Text(item.type, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+        ),
         const SizedBox(height: 8),
-        Text(item.title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: AppColors.wood900)),
+        Text(item.title, style: headingStyle(size: 20)),
         const SizedBox(height: 4),
-        Text(formatDate(item.date), style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
-        const SizedBox(height: 14),
-        Text(item.body, style: const TextStyle(height: 1.55)),
+        Text(formatDateLong(item.date),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.wood800)),
+        const SizedBox(height: 6),
+        Text(item.body, style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.wood800)),
       ]),
     );
   }
