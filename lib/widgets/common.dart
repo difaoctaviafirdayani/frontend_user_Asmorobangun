@@ -132,6 +132,15 @@ class NetImage extends StatelessWidget {
   Widget _image() {
     final s = src ?? '';
     if (s.isEmpty) return _placeholder();
+        if (s.startsWith('assets/')) {
+      return Image.asset(
+        s,
+        width: width,
+        height: height,
+        fit: fit,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      );
+    }
     if (s.startsWith('data:')) {
       try {
         return Image.memory(
