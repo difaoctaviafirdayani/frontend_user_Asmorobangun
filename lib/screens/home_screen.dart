@@ -31,12 +31,15 @@ class HomeScreen extends StatelessWidget {
           child: ListView(padding: const EdgeInsets.only(bottom: 28), children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(_pad, 16, _pad, 0),
-              child: NetImage(
-                src: 'sanggar-utama.jpg',
-                height: 220,
-                width: double.infinity,
-                radius: BorderRadius.circular(20),
-              ),
+              child: ClipRRect(
+  borderRadius: BorderRadius.circular(20),
+  child: Image.asset(
+    'assets/images/banner.jpg',
+    height: 220,
+    width: double.infinity,
+    fit: BoxFit.cover,
+  ),
+),
             ),
             _SectionTitle('Pengumuman', actionLabel: 'Lihat semua', onAction: () => _push(context, const AnnouncementsScreen())),
             _announcements(context),
@@ -226,7 +229,7 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 12),
           GestureDetector(
             onTap: () => openUrl(context, AppConfig.mapsUrl),
-            child: NetImage(src: 'peta-lokasi.jpg', height: 150, width: double.infinity, radius: BorderRadius.circular(18)),
+            child: NetImage(src: 'assets/images/banner.jpg', height: 150, width: double.infinity, radius: BorderRadius.circular(18)),
           ),
           const SizedBox(height: 14),
           Row(children: [
