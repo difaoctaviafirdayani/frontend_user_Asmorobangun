@@ -6,6 +6,7 @@ import '../core/format.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
 import '../widgets/common.dart';
+import '../widgets/location_map.dart';
 import 'announcements_screen.dart';
 import 'articles_screen.dart';
 import 'facilities_screen.dart';
@@ -387,7 +388,9 @@ class HomeScreen extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+            const LocationMap(),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
