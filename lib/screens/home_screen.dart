@@ -85,7 +85,10 @@ class HomeScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Text('asmorobangun', style: logoStyle(size: 30)),
+                  Text(
+                    'asmorobangun',
+                    style: logoStyle(size: 30, color: AppColors.cream100),
+                  ),
                   const Spacer(),
                   IconButton(
                     tooltip: 'Akun',
