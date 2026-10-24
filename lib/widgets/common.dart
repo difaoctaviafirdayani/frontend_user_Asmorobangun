@@ -69,14 +69,22 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final leading = appBarBack(context);
-    final hasLeading = leading != null || Navigator.canPop(context);
+    final Widget? leading = appBarBack(context) ??
+        (Navigator.canPop(context)
+            ? IconButton(
+                tooltip: 'Kembali',
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.maybePop(context),
+              )
+            : null);
+    final hasLeading = leading != null;
     return Scaffold(
       backgroundColor: backgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         leading: leading,
-        leadingWidth: hasLeading ? 48 : null,
-        titleSpacing: hasLeading ? 0 : null,
+        leadingWidth: hasLeading ? 52 : null,
+        titleSpacing: hasLeading ? 4 : 16,
         title: Text(title, style: headingStyle(size: 22, color: AppColors.cream100)),
         backgroundColor: AppColors.wood900,
         foregroundColor: AppColors.cream100,
@@ -95,7 +103,8 @@ class AppCard extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final VoidCallback? onTap;
   final Color? color;
-  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.margin, this.onTap, this.color});
+  final Color? borderColor;
+  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.margin, this.onTap, this.color, this.borderColor});
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +114,7 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? AppColors.cream100,
         borderRadius: radius,
-        border: Border.all(color: AppColors.line),
+        border: Border.all(color: borderColor ?? AppColors.line, width: borderColor == null ? 1 : 1.2),
         boxShadow: const [BoxShadow(color: Color(0x142A1E10), blurRadius: 10, offset: Offset(0, 2))],
       ),
       child: ClipRRect(
