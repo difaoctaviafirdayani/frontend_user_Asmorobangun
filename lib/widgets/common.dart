@@ -59,19 +59,24 @@ Widget? appBarBack(BuildContext context) {
   );
 }
 
-/// Scaffold standar halaman dalam dengan app bar coklat tua.
 class AppScaffold extends StatelessWidget {
   final String title;
   final Widget body;
   final List<Widget>? actions;
   final Widget? floatingActionButton;
-  const AppScaffold({super.key, required this.title, required this.body, this.actions, this.floatingActionButton});
+  final Color? backgroundColor;
+  const AppScaffold({super.key, required this.title, required this.body, this.actions, this.floatingActionButton, this.backgroundColor});
 
   @override
   Widget build(BuildContext context) {
+    final leading = appBarBack(context);
+    final hasLeading = leading != null || Navigator.canPop(context);
     return Scaffold(
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        leading: appBarBack(context),
+        leading: leading,
+        leadingWidth: hasLeading ? 48 : null,
+        titleSpacing: hasLeading ? 0 : null,
         title: Text(title, style: headingStyle(size: 22, color: AppColors.cream100)),
         backgroundColor: AppColors.wood900,
         foregroundColor: AppColors.cream100,
@@ -322,7 +327,6 @@ class KeyValueRow extends StatelessWidget {
       );
 }
 
-/// Kotak informasi kuning untuk ajakan login.
 class NoticeBox extends StatelessWidget {
   final Widget child;
   const NoticeBox({super.key, required this.child});

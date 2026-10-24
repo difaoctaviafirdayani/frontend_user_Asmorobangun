@@ -7,10 +7,15 @@ import '../core/format.dart';
 import '../core/theme.dart';
 import '../core/validators.dart';
 import '../models/models.dart';
+import '../widgets/auth_ui.dart';
 import '../widgets/common.dart';
 import '../widgets/payment_section.dart';
 import 'auth_screens.dart';
-import 'search_screen.dart';
+
+const _cardColor = Color(0xFFFDFAE8);
+
+String _shortName(String name) =>
+    name.replaceAll(RegExp(r'\s*\(.*\)'), '').trim();
 
 class FacilitiesScreen extends StatelessWidget {
   const FacilitiesScreen({super.key});
@@ -19,13 +24,16 @@ class FacilitiesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'Layanan Sanggar',
-      actions: [searchAction(context)],
+      backgroundColor: Colors.white,
       body: AsyncView<List<Facility>>(
-        loader: () async => mapList((await api.get('/facilities'))['facilities'], Facility.fromJson),
+        loader: () async => mapList(
+          (await api.get('/facilities'))['facilities'],
+          Facility.fromJson,
+        ),
         builder: (context, items, _) => ListView.separated(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
           itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 14),
+          separatorBuilder: (_, __) => const SizedBox(height: 16),
           itemBuilder: (context, i) => FacilityTile(facility: items[i]),
         ),
       ),
@@ -40,42 +48,84 @@ class FacilityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final f = facility;
-    final radius = BorderRadius.circular(20);
     return Material(
-      color: const Color(0xFFFDFAE8),
+      color: _cardColor,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: const BorderSide(color: AppColors.wood800, width: 1.2),
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.wood800, width: 1),
       ),
       child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacilityDetailScreen(id: f.id))),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => FacilityDetailScreen(id: f.id)),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            NetImage(src: f.image, width: 130, height: 100, radius: BorderRadius.circular(10)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: Text(f.name, style: headingStyle(size: 16))),
-                  if (f.avgRating != null) ...[
-                    const SizedBox(width: 6),
-                    const Icon(Icons.star_rounded, color: AppColors.gold400, size: 20),
-                    const SizedBox(width: 2),
-                    Text(f.avgRating!.toStringAsFixed(1), style: const TextStyle(color: AppColors.wood700, fontSize: 13)),
-                  ],
-                ]),
-                const SizedBox(height: 4),
-                Text(
-                  f.shortDesc,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.wood700, fontSize: 13, height: 1.35),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 10,
+                child: AspectRatio(
+                  aspectRatio: 1.6,
+                  child: NetImage(
+                    src: f.image,
+                    width: double.infinity,
+                    height: double.infinity,
+                    radius: BorderRadius.circular(8),
+                  ),
                 ),
-              ]),
-            ),
-          ]),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 9,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _shortName(f.name),
+                            style: headingStyle(size: 16),
+                          ),
+                        ),
+                        if (f.avgRating != null) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.star_rounded,
+                            color: AppColors.gold400,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            f.avgRating!.toStringAsFixed(1),
+                            style: const TextStyle(
+                              color: AppColors.wood700,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      f.shortDesc,
+                      maxLines: 6,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.wood700,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -95,7 +145,8 @@ class FacilityDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'Detail Layanan',
+      title: 'Layanan Sanggar',
+      backgroundColor: Colors.white,
       body: AsyncView<_FacilityData>(
         loader: () async {
           final res = await api.get('/facilities/$id');
@@ -104,7 +155,8 @@ class FacilityDetailScreen extends StatelessWidget {
             mapList(res['reviews'], Review.fromJson),
           );
         },
-        builder: (context, data, reload) => _FacilityBody(data: data, reload: reload),
+        builder: (context, data, reload) =>
+            _FacilityBody(data: data, reload: reload),
       ),
     );
   }
@@ -118,56 +170,242 @@ class _FacilityBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final f = data.facility;
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      NetImage(src: f.image, height: 200, width: double.infinity, radius: BorderRadius.circular(16)),
-      const SizedBox(height: 14),
-      Align(alignment: Alignment.centerLeft, child: TagChip(f.category)),
-      const SizedBox(height: 8),
-      Text(f.name, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: AppColors.wood900)),
-      const SizedBox(height: 4),
-      if (f.avgRating != null)
-        Row(children: [
-          StarsRow(f.avgRating!),
-          const SizedBox(width: 6),
-          Text('${f.avgRating} (${f.reviewCount} ulasan)', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
-        ])
-      else
-        const Text('Belum ada ulasan', style: TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
-      const SizedBox(height: 10),
-      Text(f.longDesc),
-      const SizedBox(height: 14),
-      AppCard(
-        color: AppColors.cream200,
-        child: Row(children: [
-          const Icon(Icons.payments_outlined, color: AppColors.wood700),
-          const SizedBox(width: 10),
-          Expanded(child: Text(f.priceInfo, style: const TextStyle(fontWeight: FontWeight.w600))),
-        ]),
-      ),
-      const SizedBox(height: 8),
-      BookingForm(facility: f),
-      const SectionHeaderInline('Ulasan pendaftar'),
-      ReviewForm(facilityId: f.id, onSubmitted: reload),
-      if (data.reviews.isEmpty)
-        const EmptyState('Jadilah yang pertama memberi ulasan.', icon: Icons.rate_review_outlined)
-      else
-        for (final r in data.reviews)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(child: Text(r.userName, style: const TextStyle(fontWeight: FontWeight.w700))),
-                  Text(formatDate(r.date), style: const TextStyle(color: AppColors.inkSoft, fontSize: 12)),
-                ]),
-                const SizedBox(height: 2),
-                StarsRow(r.rating.toDouble(), size: 15),
-                const SizedBox(height: 4),
-                Text(r.comment),
-              ]),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
+      children: [
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: NetImage(
+            src: f.image,
+            width: double.infinity,
+            height: double.infinity,
+            radius: BorderRadius.circular(10),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(_shortName(f.name), style: headingStyle(size: 24)),
+            ),
+            if (f.avgRating != null) ...[
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.star_rounded,
+                color: AppColors.gold400,
+                size: 22,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                f.avgRating!.toStringAsFixed(1),
+                style: const TextStyle(
+                  color: AppColors.wood700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          f.longDesc,
+          style: const TextStyle(
+            color: AppColors.wood800,
+            fontSize: 13.5,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.paid_outlined,
+              color: AppColors.wood800,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                f.priceInfo,
+                style: const TextStyle(
+                  color: AppColors.wood800,
+                  fontSize: 13.5,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          ],
+        ),
+        BookingForm(facility: f),
+        const _Heading('Ulasan'),
+        ReviewForm(facilityId: f.id, onSubmitted: reload),
+        if (data.reviews.isEmpty)
+          const EmptyState(
+            'Jadilah yang pertama memberi ulasan.',
+            icon: Icons.rate_review_outlined,
+          )
+        else
+          for (var i = 0; i < data.reviews.length; i++)
+            _ReviewItem(
+              review: data.reviews[i],
+              showDivider: i < data.reviews.length - 1,
+            ),
+      ],
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  final String text;
+  const _Heading(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 22, bottom: 10),
+        child: Text(text, style: headingStyle(size: 22)),
+      );
+}
+
+class _FormCard extends StatelessWidget {
+  final Widget child;
+  const _FormCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _cardColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.wood700, width: 1),
+        ),
+        child: child,
+      );
+}
+
+class _Gate extends StatelessWidget {
+  final bool enabled;
+  final Widget child;
+  const _Gate({required this.enabled, required this.child});
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+        ignoring: !enabled,
+        child: Opacity(opacity: enabled ? 1 : 0.5, child: child),
+      );
+}
+
+class _LoginNotice extends StatelessWidget {
+  final VoidCallback onTap;
+  const _LoginNotice({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: SizedBox(
+          width: double.infinity,
+          child: Material(
+            color: const Color(0xFFFFEBC8),
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: AppColors.wood700, width: 1),
+            ),
+            child: InkWell(
+              onTap: onTap,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Text(
+                  'Silakan daftar/masuk terlebih dahulu',
+                  style: TextStyle(
+                    color: AppColors.wood800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
           ),
-    ]);
+        ),
+      );
+}
+
+class _StarRow extends StatelessWidget {
+  final int value;
+  final double size;
+  const _StarRow(this.value, {this.size = 20});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 1; i <= 5; i++)
+            Icon(
+              i <= value ? Icons.star_rounded : Icons.star_border_rounded,
+              size: size,
+              color: AppColors.gold400,
+            ),
+        ],
+      );
+}
+
+class _ReviewItem extends StatelessWidget {
+  final Review review;
+  final bool showDivider;
+  const _ReviewItem({required this.review, required this.showDivider});
+
+  @override
+  Widget build(BuildContext context) {
+    final r = review;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  r.userName,
+                  style: const TextStyle(
+                    color: AppColors.wood800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                formatDateLong(r.date),
+                style: const TextStyle(
+                  color: AppColors.wood700,
+                  fontSize: 11.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          _StarRow(r.rating),
+          const SizedBox(height: 4),
+          Text(
+            r.comment,
+            style: const TextStyle(
+              color: AppColors.wood800,
+              fontSize: 13.5,
+              height: 1.45,
+            ),
+          ),
+          if (showDivider)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1, thickness: 1, color: AppColors.wood700),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -182,8 +420,6 @@ class SectionHeaderInline extends StatelessWidget {
       );
 }
 
-const _ratingLabels = {5: 'Sangat baik', 4: 'Baik', 3: 'Cukup', 2: 'Kurang', 1: 'Buruk'};
-
 class ReviewForm extends StatefulWidget {
   final String facilityId;
   final VoidCallback onSubmitted;
@@ -196,7 +432,7 @@ class ReviewForm extends StatefulWidget {
 class _ReviewFormState extends State<ReviewForm> {
   final _formKey = GlobalKey<FormState>();
   final _comment = TextEditingController();
-  int _rating = 5;
+  int _rating = 0;
   bool _busy = false;
 
   @override
@@ -206,13 +442,14 @@ class _ReviewFormState extends State<ReviewForm> {
   }
 
   Future<void> _submit() async {
-    // Lapisan 1: validasi UI
+    if (_rating < 1) {
+      showSnack(context, 'Pilih jumlah bintang dulu ya.');
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
-    // Lapisan 3: autentikasi (arahkan ke login bila belum)
     if (!await ensureLogin(context)) return;
     setState(() => _busy = true);
     try {
-      // Lapisan 2: server memvalidasi ulang dan bisa menolak
       await api.post('/facilities/${widget.facilityId}/reviews',
           body: {'rating': _rating, 'comment': Validators.clean(_comment.text)});
       if (!mounted) return;
@@ -229,85 +466,68 @@ class _ReviewFormState extends State<ReviewForm> {
   Widget build(BuildContext context) {
     final loggedIn = context.watch<AuthState>().isLoggedIn;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: AppCard(
-        child: Form(
-          key: _formKey,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (!loggedIn)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 10),
-                child: Text('Masuk untuk memberi ulasan. Kamu akan diarahkan ke halaman masuk saat mengirim.',
-                    style: TextStyle(color: AppColors.inkSoft, fontSize: 13)),
-              ),
-            const Text('Rating kamu', style: TextStyle(fontWeight: FontWeight.w600)),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
+      padding: const EdgeInsets.only(bottom: 18),
+      child: _Gate(
+        enabled: loggedIn,
+        child: _FormCard(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var n = 1; n <= 5; n++)
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => setState(() => _rating = n),
-                    icon: Icon(Icons.star_rounded, size: 30, color: n <= _rating ? AppColors.gold400 : AppColors.cream300),
+                const Text(
+                  'Rating Anda',
+                  style: TextStyle(
+                    color: AppColors.wood700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                   ),
-                const SizedBox(width: 6),
-                Text('$_rating - ${_ratingLabels[_rating]}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    for (var n = 1; n <= 5; n++)
+                      GestureDetector(
+                        onTap: () => setState(() => _rating = n),
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            n <= _rating
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            size: 32,
+                            color: n <= _rating
+                                ? AppColors.gold400
+                                : AppColors.wood800,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                AuthField(
+                  label: 'Komentar',
+                  hint: 'Tulis komentar Anda di sini',
+                  controller: _comment,
+                  minLines: 1,
+                  maxLines: 4,
+                  inputFormatters: InputFormats.maxLen(500),
+                  validator: Validators.text('Komentar', min: 3, max: 500),
+                ),
+                AuthButton(
+                  label: 'Kirim Ulasan',
+                  busy: _busy,
+                  onPressed: _submit,
+                ),
               ],
             ),
-            TextFormField(
-              controller: _comment,
-              maxLines: 3,
-              inputFormatters: InputFormats.maxLen(500),
-              decoration: inputDec('Komentar', hint: 'Bagikan pengalamanmu...'),
-              validator: Validators.text('Komentar', min: 3, max: 500),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Mengirim...' : 'Kirim ulasan')),
-          ]),
+          ),
         ),
       ),
     );
   }
 }
 
-/// Kolom tanggal yang ikut divalidasi oleh Form (menampilkan pesan error di bawahnya).
-class DateFormField extends FormField<DateTime> {
-  DateFormField({super.key, required String label, required DateTime? value, required ValueChanged<DateTime> onPicked})
-      : super(
-          initialValue: value,
-          validator: (v) => v == null ? 'Tanggal wajib dipilih' : null,
-          builder: (state) {
-            final context = state.context;
-            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final now = DateTime.now();
-                  final d = await showDatePicker(
-                    context: context,
-                    initialDate: state.value ?? now,
-                    firstDate: now,
-                    lastDate: now.add(const Duration(days: 730)),
-                  );
-                  if (d != null) {
-                    state.didChange(d);
-                    onPicked(d);
-                  }
-                },
-                icon: const Icon(Icons.event_outlined),
-                label: Text(state.value == null ? label : formatDate(dateParam(state.value!))),
-              ),
-              if (state.hasError)
-                Padding(
-                  padding: const EdgeInsets.only(left: 12, top: 6),
-                  child: Text(state.errorText!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
-                ),
-            ]);
-          },
-        );
-}
-
-/// Formulir pendaftaran/booking. Isinya berbeda untuk tiap jenis layanan:
-/// wisata, reguler, rental, dan event.
 class BookingForm extends StatefulWidget {
   final Facility facility;
   const BookingForm({super.key, required this.facility});
@@ -324,6 +544,7 @@ class _BookingFormState extends State<BookingForm> {
   final _location = TextEditingController();
   final _guests = TextEditingController();
   final _qty = TextEditingController(text: '1');
+  final _dateCtrl = TextEditingController();
   DateTime? _date;
   bool _busy = false;
   Booking? _result;
@@ -334,19 +555,20 @@ class _BookingFormState extends State<BookingForm> {
 
   @override
   void dispose() {
-    for (final c in [_scheduleText, _notes, _eventType, _location, _guests, _qty]) {
+    for (final c in [_scheduleText, _notes, _eventType, _location, _guests, _qty, _dateCtrl]) {
       c.dispose();
     }
     super.dispose();
   }
 
-  String get _heading => const {
-        'wisata': 'Daftar & bayar',
-        'reguler': 'Formulir pendaftaran',
-        'rental': 'Ajukan sewa',
-        'event': 'Ajukan panggilan / kunjungan',
-      }[f.bookingType] ??
-      'Daftar';
+  String get _heading => f.bookingType == 'event'
+      ? 'Ajukan ${_shortName(f.name)}'
+      : const {
+            'wisata': 'Daftar & bayar',
+            'reguler': 'Formulir pendaftaran',
+            'rental': 'Ajukan sewa',
+          }[f.bookingType] ??
+          'Daftar';
 
   String get _submitLabel => const {
         'wisata': 'Daftar & Bayar',
@@ -356,17 +578,38 @@ class _BookingFormState extends State<BookingForm> {
       }[f.bookingType] ??
       'Kirim';
 
+  String get _dateLabel => f.bookingType == 'rental'
+      ? 'Tanggal Sewa'
+      : f.bookingType == 'event'
+          ? 'Tanggal Acara'
+          : 'Tanggal Kunjungan';
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  Future<void> _pickDate() async {
+    FocusScope.of(context).unfocus();
+    final now = DateTime.now();
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date ?? now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 730)),
+    );
+    if (d != null && mounted) {
+      _date = d;
+      _dateCtrl.text = _fmtDate(d);
+    }
+  }
+
   Future<void> _submit() async {
-    // Lapisan 1: validasi UI
     if (!_formKey.currentState!.validate()) return;
-    // Lapisan 3: autentikasi
     if (!await ensureLogin(context)) return;
 
     final body = <String, dynamic>{
       'facilityId': f.id,
       'date': _usesDatePicker ? dateParam(_date!) : Validators.clean(_scheduleText.text),
       'notes': Validators.clean(_notes.text),
-      // Metode pembayaran dipilih setelahnya lewat bagian pembayaran.
       'paymentMethod': _needsPaymentNow ? 'qris' : null,
     };
     if (f.bookingType == 'event') {
@@ -375,13 +618,10 @@ class _BookingFormState extends State<BookingForm> {
       final g = int.tryParse(_guests.text.trim());
       if (g != null) body['guestCount'] = g;
     }
-    // Sengaja TIDAK mengirim nominal harga: harga harus dihitung server dari
-    // data fasilitas, bukan dipercaya dari aplikasi (mencegah manipulasi harga).
     if (f.bookingType == 'wisata') body['guestCount'] = int.parse(_qty.text.trim());
 
     setState(() => _busy = true);
     try {
-      // Lapisan 2: server memvalidasi ulang. Otorisasi: userId diambil dari token, bukan dari body.
       final res = await api.post('/bookings', body: body);
       if (!mounted) return;
       showSnack(context, 'Permintaan terkirim!');
@@ -396,102 +636,129 @@ class _BookingFormState extends State<BookingForm> {
   @override
   Widget build(BuildContext context) {
     final loggedIn = context.watch<AuthState>().isLoggedIn;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionHeaderInline(_heading),
-      if (!loggedIn)
-        const NoticeBox(
-          child: Text('Perlu masuk dulu. Pendaftaran/booking mengharuskan kamu login supaya statusnya bisa dipantau. Kamu akan diarahkan ke halaman masuk saat mengirim.'),
-        ),
-      if (_result != null) _resultView(_result!) else _form(),
-    ]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Heading(_heading),
+        if (_result != null)
+          _resultView(_result!)
+        else ...[
+          if (!loggedIn)
+            _LoginNotice(onTap: () {
+              ensureLogin(context);
+            }),
+          _form(loggedIn),
+        ],
+      ],
+    );
   }
 
-  Widget _form() {
-    return AppCard(
-      child: Form(
-        key: _formKey,
-        autovalidateMode: AutovalidateMode.onUserInteraction,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (f.bookingType == 'event') ...[
-            TextFormField(
-              controller: _eventType,
-              inputFormatters: InputFormats.maxLen(80),
-              decoration: inputDec('Jenis acara', hint: 'mis. Pernikahan, Festival, Study Tour'),
-              validator: Validators.text('Jenis acara', min: 3, max: 80),
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (_usesDatePicker)
-            DateFormField(
-              label: f.bookingType == 'rental'
-                  ? 'Pilih tanggal sewa'
-                  : f.bookingType == 'event'
-                      ? 'Pilih tanggal acara'
-                      : 'Pilih tanggal kunjungan',
-              value: _date,
-              onPicked: (d) => _date = d,
-            )
-          else
-            TextFormField(
-              controller: _scheduleText,
-              inputFormatters: InputFormats.maxLen(100),
-              decoration: inputDec('Jadwal yang diinginkan', hint: 'mis. Sabtu sore, atau sesuai jadwal tersedia'),
-              validator: Validators.text('Jadwal', min: 3, max: 100),
-            ),
-          const SizedBox(height: 12),
-          if (f.bookingType == 'wisata') ...[
-            TextFormField(
-              controller: _qty,
-              keyboardType: TextInputType.number,
-              inputFormatters: InputFormats.digitsOnly,
-              decoration: inputDec('Jumlah peserta'),
-              validator: Validators.integer('Jumlah peserta', min: 1, max: 50),
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (f.bookingType == 'event') ...[
-            TextFormField(
-              controller: _location,
-              maxLines: 2,
-              inputFormatters: InputFormats.maxLen(200),
-              decoration: inputDec('Lokasi acara', hint: 'Alamat lengkap lokasi acara'),
-              validator: Validators.text('Lokasi acara', min: 5, max: 200),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _guests,
-              keyboardType: TextInputType.number,
-              inputFormatters: InputFormats.digitsOnly,
-              decoration: inputDec('Perkiraan jumlah tamu/peserta (opsional)'),
-              validator: Validators.integer('Jumlah tamu', min: 1, max: 5000, required: false),
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (f.bookingType != 'wisata')
-            TextFormField(
-              controller: _notes,
-              maxLines: 2,
-              inputFormatters: InputFormats.maxLen(500),
-              decoration: inputDec(
-                f.bookingType == 'rental' ? 'Karakter / ukuran kostum' : (f.bookingType == 'event' ? 'Catatan tambahan (opsional)' : 'Catatan (usia, pengalaman, dll)'),
-                hint: f.bookingType == 'rental' ? 'mis. Kostum Panji, ukuran M' : (f.bookingType == 'event' ? 'Durasi, lakon yang diinginkan, dll' : 'Ceritakan sedikit tentang dirimu'),
-              ),
-              validator: Validators.text('Catatan', min: 2, max: 500, required: f.bookingType == 'rental'),
-            ),
-          const SizedBox(height: 10),
-          Text(_hint(), style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Mengirim...' : _submitLabel)),
+  Widget _form(bool loggedIn) {
+    final type = f.bookingType;
+    return _Gate(
+      enabled: loggedIn,
+      child: _FormCard(
+        child: Form(
+          key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (type == 'event')
+                AuthField(
+                  label: 'Jenis Acara',
+                  hint: 'misalnya Pernikahan atau Festival',
+                  boldLabel: false,
+                  controller: _eventType,
+                  inputFormatters: InputFormats.maxLen(80),
+                  validator: Validators.text('Jenis acara', min: 3, max: 80),
+                ),
+              if (_usesDatePicker)
+                AuthField(
+                  label: _dateLabel,
+                  hint: 'dd/mm/yyyy',
+                  boldLabel: false,
+                  controller: _dateCtrl,
+                  readOnly: true,
+                  onTap: _pickDate,
+                  trailing: const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 20,
+                    color: AppColors.wood700,
+                  ),
+                  validator: (_) => _date == null ? 'Tanggal wajib dipilih' : null,
+                )
+              else
+                AuthField(
+                  label: 'Jadwal yang Diinginkan',
+                  hint: 'mis. Sabtu sore, atau sesuai jadwal tersedia',
+                  boldLabel: false,
+                  controller: _scheduleText,
+                  inputFormatters: InputFormats.maxLen(100),
+                  validator: Validators.text('Jadwal', min: 3, max: 100),
+                ),
+              if (type == 'wisata')
+                AuthField(
+                  label: 'Jumlah Peserta',
+                  boldLabel: false,
+                  controller: _qty,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: InputFormats.digitsOnly,
+                  validator: Validators.integer('Jumlah peserta', min: 1, max: 50),
+                ),
+              if (type == 'event') ...[
+                AuthField(
+                  label: 'Lokasi Acara',
+                  hint: 'Alamat lengkap',
+                  boldLabel: false,
+                  controller: _location,
+                  minLines: 1,
+                  maxLines: 3,
+                  inputFormatters: InputFormats.maxLen(200),
+                  validator: Validators.text('Lokasi acara', min: 5, max: 200),
+                ),
+                AuthField(
+                  label: 'Perkiraan Jumlah Audiens',
+                  hint: 'mis. 100 orang (opsional)',
+                  boldLabel: false,
+                  controller: _guests,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: InputFormats.digitsOnly,
+                  validator: Validators.integer('Jumlah tamu', min: 1, max: 5000, required: false),
+                ),
+              ],
+              if (type != 'wisata')
+                AuthField(
+                  label: type == 'rental'
+                      ? 'Karakter / Ukuran Kostum'
+                      : (type == 'event' ? 'Catatan Tambahan' : 'Catatan (usia, pengalaman, dll)'),
+                  hint: type == 'rental'
+                      ? 'mis. Kostum Panji, ukuran M'
+                      : (type == 'event' ? 'Durasi, lakon yang diinginkan, dll' : 'Ceritakan sedikit tentang dirimu'),
+                  boldLabel: false,
+                  controller: _notes,
+                  minLines: 1,
+                  maxLines: 3,
+                  inputFormatters: InputFormats.maxLen(500),
+                  validator: Validators.text('Catatan', min: 2, max: 500, required: type == 'rental'),
+                ),
+              if (type != 'event')
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Text(
+                    _hint(),
+                    style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5),
+                  ),
+                ),
+              AuthButton(label: _submitLabel, busy: _busy, onPressed: _submit),
+            ],
           ),
-        ]),
+        ),
       ),
     );
   }
 
   String _hint() {
-    if (f.bookingType == 'event') return 'Tim kami akan meninjau permintaan ini dan menghubungimu untuk penawaran harga.';
     if (f.id == 'les-karawitan') return 'Kelas karawitan masih gratis. Cukup kirim pendaftaran, admin akan menghubungimu untuk jadwal.';
     if (_needsPaymentNow) return 'Setelah mengirim, kamu akan memilih metode pembayaran (QRIS / Transfer / Tunai). Bukti pembayaran hanya diperlukan untuk QRIS dan transfer.';
     return 'Metode pembayaran bisa dikonfirmasi belakangan bila diperlukan.';
@@ -514,14 +781,11 @@ class _BookingFormState extends State<BookingForm> {
           amount: b.amount,
           methods: f.paymentMethods,
           onDone: () async {
-            // Ambil status terbaru agar tampilan menyesuaikan (tunai / menunggu verifikasi).
             try {
               final res = await api.get('/bookings/mine');
               final mine = mapList(res['bookings'], Booking.fromJson).where((x) => x.id == b.id);
               if (mine.isNotEmpty && mounted) setState(() => _result = mine.first);
-            } on ApiException {
-              // biarkan tampilan apa adanya
-            }
+            } on ApiException {}
           },
         ),
       ]);

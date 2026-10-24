@@ -122,6 +122,14 @@ class AuthField extends StatelessWidget {
   final bool enableSuggestions;
   final bool autocorrect;
 
+  final bool boldLabel;
+  final int? minLines;
+  final int maxLines;
+  final bool readOnly;
+  final VoidCallback? onTap;
+
+  final Widget? trailing;
+
   final bool obscureText;
 
   final VoidCallback? onToggleObscure;
@@ -142,6 +150,12 @@ class AuthField extends StatelessWidget {
     this.onFieldSubmitted,
     this.enableSuggestions = true,
     this.autocorrect = true,
+    this.boldLabel = true,
+    this.minLines,
+    this.maxLines = 1,
+    this.readOnly = false,
+    this.onTap,
+    this.trailing,
     this.obscureText = false,
     this.onToggleObscure,
   });
@@ -161,10 +175,10 @@ class AuthField extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.wood700,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+              fontSize: boldLabel ? 15 : 14,
+              fontWeight: boldLabel ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
           const SizedBox(height: 6),
@@ -181,6 +195,10 @@ class AuthField extends StatelessWidget {
             enableSuggestions: enableSuggestions,
             autocorrect: autocorrect,
             obscureText: obscureText,
+            minLines: minLines,
+            maxLines: maxLines,
+            readOnly: readOnly,
+            onTap: onTap,
             style: const TextStyle(color: AppColors.ink, fontSize: 15),
             decoration: InputDecoration(
               hintText: hint,
@@ -208,7 +226,7 @@ class AuthField extends StatelessWidget {
               errorBorder: _border(AppColors.danger),
               focusedErrorBorder: _border(AppColors.danger, 2),
               suffixIcon: onToggleObscure == null
-                  ? null
+                  ? trailing
                   : IconButton(
                       tooltip: obscureText ? 'Tampilkan' : 'Sembunyikan',
                       icon: Icon(
