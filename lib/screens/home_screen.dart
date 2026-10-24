@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
@@ -33,6 +32,7 @@ class HomeScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.only(bottom: 28),
               children: [
+                _heroBanner(),
                 _SectionTitle(
                   'Pengumuman',
                   actionLabel: 'Lihat semua',
@@ -129,6 +129,32 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _heroBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_pad, 16, _pad, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: AspectRatio(
+          aspectRatio: 1026 / 507,
+          child: Image.asset(
+            'assets/images/banner.png',
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: AppColors.cream300,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.image_outlined,
+                color: AppColors.inkSoft,
+                size: 40,
+              ),
+            ),
           ),
         ),
       ),
