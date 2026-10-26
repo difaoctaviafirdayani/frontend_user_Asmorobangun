@@ -16,6 +16,8 @@ dependencies:
   image_picker: ^1.1.2
   url_launcher: ^6.3.0
   google_fonts: ^6.2.1
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:
@@ -25,7 +27,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/
+    - assets/images/banner.png
   fonts:
     - family: Upakarti
       fonts:

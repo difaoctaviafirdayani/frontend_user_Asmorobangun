@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../core/api.dart';
@@ -7,6 +6,7 @@ import '../core/format.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
 import '../widgets/common.dart';
+import '../widgets/location_map.dart';
 import 'announcements_screen.dart';
 import 'articles_screen.dart';
 import 'facilities_screen.dart';
@@ -33,6 +33,7 @@ class HomeScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.only(bottom: 28),
               children: [
+                _heroBanner(),
                 _SectionTitle(
                   'Pengumuman',
                   actionLabel: 'Lihat semua',
@@ -85,7 +86,10 @@ class HomeScreen extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Text('asmorobangun', style: logoStyle(size: 30)),
+                  Text(
+                    'asmorobangun',
+                    style: logoStyle(size: 30, color: AppColors.cream100),
+                  ),
                   const Spacer(),
                   IconButton(
                     tooltip: 'Akun',
@@ -129,6 +133,32 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _heroBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(_pad, 16, _pad, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: AspectRatio(
+          aspectRatio: 1026 / 507,
+          child: Image.asset(
+            'assets/images/banner.png',
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: AppColors.cream300,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.image_outlined,
+                color: AppColors.inkSoft,
+                size: 40,
+              ),
+            ),
           ),
         ),
       ),
@@ -358,7 +388,9 @@ class HomeScreen extends StatelessWidget {
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+            const LocationMap(),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(

@@ -7,11 +7,6 @@ import '../core/picker.dart';
 import '../core/theme.dart';
 import 'common.dart';
 
-/// Alur pembayaran yang sama untuk booking layanan dan pesanan topeng:
-///   QRIS          -> tampil gambar QRIS, lalu unggah bukti pembayaran
-///   Transfer Bank -> tampil rekening, lalu unggah bukti pembayaran
-///   Tunai         -> cukup pilih "Bayar Tunai", tanpa bukti
-/// kind: 'booking' atau 'topeng'.
 class PaymentSection extends StatefulWidget {
   final String kind;
   final String id;
@@ -52,7 +47,8 @@ class _PaymentSectionState extends State<PaymentSection> {
       return cfg is! Map || cfg['enabled'] != false;
     }
 
-    return ['qris', 'transfer', 'cash'].where(on).toList();
+    final all = widget.kind == 'topeng' ? ['qris', 'transfer'] : ['qris', 'transfer', 'cash'];
+    return all.where(on).toList();
   }
 
   @override
@@ -115,12 +111,20 @@ class _PaymentSectionState extends State<PaymentSection> {
   @override
   Widget build(BuildContext context) {
     if (widget.existingProof != null && widget.existingProof!.isNotEmpty) return _proofDone();
-    if (widget.existingMethod == 'cash' && !_changing) return _cashDone();
+    if (widget.kind != 'topeng' && widget.existingMethod == 'cash' && !_changing) return _cashDone();
     return _picker();
   }
 
+  bool get _topeng => widget.kind == 'topeng';
+
+  Widget _card({required Widget child}) => AppCard(
+        color: _topeng ? const Color(0xFFFDFBE8) : null,
+        borderColor: _topeng ? AppColors.wood700 : null,
+        child: child,
+      );
+
   Widget _doneBox({required IconData icon, required String title, required String subtitle, List<Widget> actions = const []}) {
-    return AppCard(
+    return _card(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
@@ -177,7 +181,7 @@ class _PaymentSectionState extends State<PaymentSection> {
       return const AppCard(child: EmptyState('Belum ada metode pembayaran yang aktif. Silakan hubungi admin sanggar.'));
     }
     final current = _method ?? methods.first;
-    return AppCard(
+    return _card(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Pilih metode pembayaran', style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
@@ -186,7 +190,13 @@ class _PaymentSectionState extends State<PaymentSection> {
             ChoiceChip(
               label: Text(methodLabel(m)),
               selected: current == m,
-              selectedColor: AppColors.gold300,
+              selectedColor: _topeng ? AppColors.wood700 : AppColors.gold300,
+              backgroundColor: _topeng ? Colors.white : null,
+              checkmarkColor: _topeng ? Colors.white : null,
+              side: _topeng ? const BorderSide(color: AppColors.wood700, width: 1.3) : null,
+              labelStyle: _topeng
+                  ? TextStyle(color: current == m ? Colors.white : AppColors.wood700)
+                  : null,
               onSelected: (_) => _select(m),
             ),
         ]),

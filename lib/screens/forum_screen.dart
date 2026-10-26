@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/api.dart';
+import '../core/auth_state.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../core/validators.dart';
 import '../models/models.dart';
 import '../widgets/common.dart';
 import 'auth_screens.dart';
-import 'facilities_screen.dart' show SectionHeaderInline;
-import 'search_screen.dart';
 
 const _defaultCategories = ['Diskusi Umum', 'Kelas Tari', 'Karawitan', 'Topeng', 'Acara & Booking'];
 
@@ -17,11 +17,11 @@ Future<List<String>> _loadCategories() async {
     final res = await api.get('/forum/categories');
     final list = res['categories'];
     if (list is List && list.isNotEmpty) return list.map((e) => e.toString()).toList();
-  } on ApiException {
-    // pakai daftar bawaan
-  }
+  } on ApiException {}
   return _defaultCategories;
 }
+
+const _filterCategories = ['Diskusi Umum', 'Layanan'];
 
 class ForumScreen extends StatefulWidget {
   const ForumScreen({super.key});
@@ -31,70 +31,111 @@ class ForumScreen extends StatefulWidget {
 }
 
 class _ForumScreenState extends State<ForumScreen> {
+  final _search = TextEditingController();
   String _category = '';
+  String _query = '';
   late Future<List<ThreadSummary>> _future = _load();
-  late final Future<List<String>> _categories = _loadCategories();
 
-  Future<List<ThreadSummary>> _load() async {
-    final q = <String, String>{if (_category.isNotEmpty) 'category': _category};
-    return mapList((await api.get('/forum', query: q))['threads'], ThreadSummary.fromJson);
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
+  Future<List<ThreadSummary>> _load() async =>
+      mapList((await api.get('/forum'))['threads'], ThreadSummary.fromJson);
+
   void _refresh() {
-  final future = _load();
-  setState(() {
-    _future = future;
-  });
-}
+    final future = _load();
+    setState(() {
+      _future = future;
+    });
+  }
 
   Future<void> _newThread() async {
-    // Lapisan 3: autentikasi sebelum membuat diskusi
     if (!await ensureLogin(context)) return;
     if (!mounted) return;
     final created = await showNewThreadSheet(context);
     if (created == true) _refresh();
   }
 
+  OutlineInputBorder _noBorder() =>
+      OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none);
+
+  Widget _searchBar() => TextField(
+        controller: _search,
+        onChanged: (v) => setState(() => _query = v),
+        cursorColor: Colors.white,
+        style: const TextStyle(color: Colors.white, fontSize: 16),
+        decoration: InputDecoration(
+          hintText: 'Cari topik diskusi',
+          hintStyle: const TextStyle(color: Colors.white, fontSize: 16),
+          prefixIcon: const Icon(Icons.search_rounded, color: Colors.white),
+          suffixIcon: _query.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () {
+                    _search.clear();
+                    setState(() => _query = '');
+                  },
+                ),
+          filled: true,
+          fillColor: AppColors.wood700,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: _noBorder(),
+          enabledBorder: _noBorder(),
+          focusedBorder: _noBorder(),
+        ),
+      );
+
+  Widget _filterDropdown() {
+    final items = ['', ..._filterCategories];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.wood700, width: 1.5),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _category,
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(16),
+          dropdownColor: Colors.white,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.wood700),
+          style: const TextStyle(fontSize: 15, color: AppColors.wood700),
+          items: [
+            for (final c in items) DropdownMenuItem(value: c, child: Text(c.isEmpty ? 'Semua kategori' : c)),
+          ],
+          onChanged: (v) => setState(() => _category = v ?? ''),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'Forum Diskusi',
-      actions: [searchAction(context)],
+      backgroundColor: Colors.white,
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.wood800,
-        foregroundColor: AppColors.cream100,
+        backgroundColor: AppColors.wood700,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         onPressed: _newThread,
         icon: const Icon(Icons.edit_outlined),
-        label: const Text('Diskusi baru'),
+        label: const Text('Diskusi Baru', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
       ),
       body: Column(children: [
-        FutureBuilder<List<String>>(
-          future: _categories,
-          builder: (context, snap) {
-            final cats = snap.data ?? const <String>[];
-            return SizedBox(
-              height: 54,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                children: [
-                  for (final c in ['', ...cats])
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(c.isEmpty ? 'Semua' : c),
-                        selected: _category == c,
-                        selectedColor: AppColors.gold300,
-                        onSelected: (_) {
-                          _category = c;
-                          _refresh();
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: _searchBar(),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: _filterDropdown(),
         ),
         Expanded(
           child: FutureBuilder<List<ThreadSummary>>(
@@ -104,30 +145,44 @@ class _ForumScreenState extends State<ForumScreen> {
                 return const Center(child: CircularProgressIndicator(color: AppColors.gold400));
               }
               if (snap.hasError) return ErrorView(message: snap.error.toString(), onRetry: _refresh);
-              final items = snap.data ?? [];
-              if (items.isEmpty) return const EmptyState('Belum ada diskusi. Mulai yang pertama!', icon: Icons.forum_outlined);
+              final q = _query.trim().toLowerCase();
+              final items = (snap.data ?? []).where((t) {
+                final okCat = _category.isEmpty || t.category.toLowerCase() == _category.toLowerCase();
+                final okQ = q.isEmpty || t.title.toLowerCase().contains(q);
+                return okCat && okQ;
+              }).toList();
+              if (items.isEmpty) {
+                return EmptyState(
+                  (snap.data ?? []).isEmpty ? 'Belum ada diskusi. Mulai yang pertama!' : 'Tidak ada diskusi yang cocok.',
+                  icon: Icons.forum_outlined,
+                );
+              }
               return RefreshIndicator(
                 onRefresh: () async => _refresh(),
-                child: ListView.separated(
+                child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, i) {
                     final t = items[i];
-                    return AppCard(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ThreadScreen(id: t.id))).then((_) => _refresh()),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        TagChip(t.category),
-                        const SizedBox(height: 8),
-                        Text(t.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15.5)),
-                        const SizedBox(height: 6),
-                        Row(children: [
-                          Expanded(child: Text('${t.userName} · ${formatDate(t.date)}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5))),
-                          const Icon(Icons.chat_bubble_outline_rounded, size: 15, color: AppColors.inkSoft),
-                          const SizedBox(width: 4),
-                          Text('${t.replyCount}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
+                    return InkWell(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ThreadScreen(id: t.id)))
+                          .then((_) => _refresh()),
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(2, 12, 2, 10),
+                        decoration: const BoxDecoration(
+                          border: Border(bottom: BorderSide(color: AppColors.wood700, width: 1.2)),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(t.category.toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.wood700)),
+                          const SizedBox(height: 2),
+                          Text(t.title,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, height: 1.35, color: AppColors.wood700)),
+                          const SizedBox(height: 2),
+                          Text('${t.userName} - ${formatDateLong(t.date)} - ${t.replyCount} balasan',
+                              style: const TextStyle(fontSize: 14, color: AppColors.wood700)),
                         ]),
-                      ]),
+                      ),
                     );
                   },
                 ),
@@ -140,8 +195,6 @@ class _ForumScreenState extends State<ForumScreen> {
   }
 }
 
-/// Bottom sheet "Mulai Diskusi Baru" (sesuai desain Figma).
-/// Muncul di atas halaman forum, bar navigasi bawah tetap terlihat.
 Future<bool?> showNewThreadSheet(BuildContext context) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -175,11 +228,9 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
   }
 
   Future<void> _submit() async {
-    // Lapisan 1: validasi UI
     if (!_form.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      // Lapisan 2: server memvalidasi ulang; Lapisan 3/4: server membaca identitas dari token
       await api.post('/forum', body: {
         'title': Validators.clean(_title.text),
         'content': Validators.clean(_content.text),
@@ -221,7 +272,6 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // Sheet naik mengikuti keyboard.
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: keyboard),
@@ -352,10 +402,15 @@ class _ThreadScreenState extends State<ThreadScreen> {
     }
   }
 
+  OutlineInputBorder _border(Color c, [double w = 1.5]) =>
+      OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: c, width: w));
+
   @override
   Widget build(BuildContext context) {
+    final loggedIn = context.watch<AuthState>().isLoggedIn;
     return AppScaffold(
-      title: 'Diskusi',
+      title: 'Forum Diskusi',
+      backgroundColor: Colors.white,
       body: FutureBuilder<ForumThread>(
         future: _future,
         builder: (context, snap) {
@@ -364,51 +419,100 @@ class _ThreadScreenState extends State<ThreadScreen> {
           }
           if (snap.hasError) return ErrorView(message: snap.error.toString(), onRetry: () => setState(() => _future = _load()));
           final t = snap.data!;
-          return ListView(padding: const EdgeInsets.all(16), children: [
-            Align(alignment: Alignment.centerLeft, child: TagChip(t.category)),
-            const SizedBox(height: 8),
-            Text(t.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.wood900)),
-            const SizedBox(height: 4),
-            Text('${t.userName} · ${formatDate(t.date)}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
-            const SizedBox(height: 12),
-            Text(t.content, style: const TextStyle(height: 1.5)),
-            SectionHeaderInline('Balasan (${t.replies.length})'),
-            if (t.replies.isEmpty) const EmptyState('Belum ada balasan.', icon: Icons.chat_bubble_outline_rounded),
+          const brown = AppColors.wood700;
+          return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 28), children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(2, 0, 2, 12),
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: brown, width: 1.2))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(t.category.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: brown)),
+                const SizedBox(height: 2),
+                Text(t.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, height: 1.35, color: brown)),
+                const SizedBox(height: 2),
+                Text('${t.userName} - ${formatDateLong(t.date)} - ${t.replies.length} balasan',
+                    style: const TextStyle(fontSize: 14, color: brown)),
+                if (t.content.trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(t.content, style: const TextStyle(height: 1.5, fontSize: 15, color: brown)),
+                ],
+              ]),
+            ),
+            const SizedBox(height: 14),
+            Text('${t.replies.length} balasan', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: brown)),
+            const SizedBox(height: 10),
             for (final r in t.replies)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: AppCard(
-                  color: AppColors.cream200,
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: brown, width: 1.2),
+                  ),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      Expanded(child: Text(r.userName, style: const TextStyle(fontWeight: FontWeight.w700))),
-                      Text(formatDate(r.date), style: const TextStyle(color: AppColors.inkSoft, fontSize: 12)),
+                      Expanded(child: Text(r.userName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: brown))),
+                      Text(formatDateLong(r.date), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: brown)),
                     ]),
                     const SizedBox(height: 4),
-                    Text(r.content),
+                    Text(r.content, style: const TextStyle(height: 1.45, fontSize: 15, color: brown)),
                   ]),
                 ),
               ),
-            const SizedBox(height: 8),
-            AppCard(
-              child: Form(
+            const SizedBox(height: 4),
+            if (!loggedIn)
+              GestureDetector(
+                onTap: () => ensureLogin(context),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEDCB),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: brown, width: 1.5),
+                  ),
+                  child: const Text('Masuk untuk membalas diskusi ini.', style: TextStyle(fontSize: 16, color: brown)),
+                ),
+              )
+            else
+              Form(
                 key: _form,
                 child: Column(children: [
                   TextFormField(
                     controller: _reply,
                     maxLines: 3,
                     inputFormatters: InputFormats.maxLen(1000),
-                    decoration: inputDec('Tulis balasan'),
+                    decoration: InputDecoration(
+                      hintText: 'Tulis balasan',
+                      hintStyle: const TextStyle(color: AppColors.inkSoft),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.all(16),
+                      border: _border(brown),
+                      enabledBorder: _border(brown),
+                      focusedBorder: _border(AppColors.gold400, 2),
+                      errorBorder: _border(AppColors.danger),
+                      focusedErrorBorder: _border(AppColors.danger, 2),
+                    ),
                     validator: Validators.text('Balasan', min: 2, max: 1000),
                   ),
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(onPressed: _busy ? null : _send, child: Text(_busy ? 'Mengirim...' : 'Kirim balasan')),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: brown,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                      ),
+                      onPressed: _busy ? null : _send,
+                      child: Text(_busy ? 'Mengirim...' : 'Kirim balasan', style: const TextStyle(fontSize: 16)),
+                    ),
                   ),
                 ]),
               ),
-            ),
           ]);
         },
       ),
