@@ -75,8 +75,8 @@ class Review {
 
 class Topeng {
   final String id, name, character, color, image, desc;
-  final int price, stock;
-  Topeng({required this.id, required this.name, required this.character, required this.color, required this.image, required this.desc, required this.price, required this.stock});
+  final int price;
+    Topeng({required this.id, required this.name, required this.character, required this.color, required this.image, required this.desc, required this.price});
   factory Topeng.fromJson(Map<String, dynamic> j) => Topeng(
         id: _s(j['id']),
         name: _s(j['name']),
@@ -85,7 +85,6 @@ class Topeng {
         image: _s(j['image']),
         desc: _s(j['desc']),
         price: _i(j['price']),
-        stock: _i(j['stock']),
       );
 }
 

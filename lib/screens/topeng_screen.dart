@@ -154,11 +154,8 @@ class _TopengBodyState extends State<_TopengBody> {
     super.dispose();
   }
 
-  Future<void> _order() async {
+    Future<void> _order() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_qty > widget.topeng.stock) {
-      return showSnack(context, 'Jumlah melebihi stok yang tersedia (${widget.topeng.stock}).');
-    }
     if (!await ensureLogin(context)) return;
     setState(() => _busy = true);
     try {
@@ -220,10 +217,10 @@ class _TopengBodyState extends State<_TopengBody> {
           child: Text('$_qty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.wood700)),
         ),
         InkWell(
-          onTap: _qty < widget.topeng.stock ? () => setState(() => _qty++) : null,
+          onTap: _qty < 99 ? () => setState(() => _qty++) : null,
           child: Padding(
             padding: const EdgeInsets.all(6),
-            child: Icon(Icons.add, color: _qty < widget.topeng.stock ? AppColors.wood700 : AppColors.line),
+            child: Icon(Icons.add, color: _qty < 99 ? AppColors.wood700 : AppColors.line),
           ),
         ),
       ]);
