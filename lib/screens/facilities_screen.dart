@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/format.dart';
@@ -31,7 +30,10 @@ class FacilitiesScreen extends StatelessWidget {
           Facility.fromJson,
         ),
         builder: (context, items, _) => ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
+            vertical: 20,
+          ),
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
           itemBuilder: (context, i) => FacilityTile(facility: items[i]),
@@ -62,13 +64,60 @@ class FacilityTile extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 10,
-                child: AspectRatio(
-                  aspectRatio: 1.6,
+          child: LayoutBuilder(builder: (context, c) {
+            final narrow = c.maxWidth < 600;
+            final imageW = c.maxWidth * (narrow ? 0.54 : 0.52);
+            const gap = 12.0;
+            return Stack(
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(left: imageW + gap),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: imageW / 1.6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _shortName(f.name),
+                                style: headingStyle(size: narrow ? 14 : 16),
+                              ),
+                            ),
+                            if (f.avgRating != null) ...[
+                              const SizedBox(width: 4),
+                              const Icon(Icons.star_rounded, color: AppColors.gold400, size: 16),
+                              const SizedBox(width: 2),
+                              Text(
+                                f.avgRating!.toStringAsFixed(1),
+                                style: const TextStyle(color: AppColors.wood700, fontSize: 12),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          f.shortDesc,
+                          maxLines: narrow ? 5 : 6,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.wood700,
+                            fontSize: narrow ? 12 : 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: imageW,
                   child: NetImage(
                     src: f.image,
                     width: double.infinity,
@@ -76,56 +125,9 @@ class FacilityTile extends StatelessWidget {
                     radius: BorderRadius.circular(8),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 9,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _shortName(f.name),
-                            style: headingStyle(size: 16),
-                          ),
-                        ),
-                        if (f.avgRating != null) ...[
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.star_rounded,
-                            color: AppColors.gold400,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            f.avgRating!.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: AppColors.wood700,
-                              fontSize: 12.5,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      f.shortDesc,
-                      maxLines: 6,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.wood700,
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+              ],
+            );
+          }),
         ),
       ),
     );
