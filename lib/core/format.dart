@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'config.dart';
 import 'theme.dart';
 
@@ -20,7 +19,7 @@ String formatRupiah(num? n) {
 String formatDate(String? iso) {
   if (iso == null || iso.isEmpty) return '';
   final d = DateTime.tryParse(iso);
-  if (d == null) return iso; // mis. "Sabtu sore" pada pendaftaran reguler
+  if (d == null) return iso;
   final l = d.toLocal();
   return '${l.day} ${_months[l.month - 1]} ${l.year}';
 }
@@ -37,8 +36,6 @@ String formatDateLong(String? iso) {
 String dateParam(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-/// Gambar bisa berupa URL penuh, data URL (QRIS simulasi), path /uploads/...,
-/// atau nama file lama dari data seed (dilayani backend di /app/assets).
 String assetUrl(String? image) {
   if (image == null || image.isEmpty) return '';
   if (image.startsWith('http')) return image;
@@ -46,7 +43,6 @@ String assetUrl(String? image) {
   return '${AppConfig.origin}/app/assets/$image';
 }
 
-/// (label, warna) untuk chip status booking & pesanan.
 (String, Color) statusInfo(String status) {
   const labels = {
     'menunggu_pembayaran': 'Menunggu Pembayaran',
@@ -58,11 +54,13 @@ String assetUrl(String? image) {
     'dikirim': 'Dikirim',
     'selesai': 'Selesai',
     'ditolak': 'Ditolak',
+    'dibatalkan': 'Dibatalkan',
   };
   final label = labels[status] ?? status;
   Color color = AppColors.wait;
   if (status == 'dikonfirmasi' || status == 'selesai' || status == 'dikirim') color = AppColors.ok;
   if (status == 'ditolak') color = AppColors.danger;
+  if (status == 'dibatalkan') color = AppColors.danger;
   return (label, color);
 }
 

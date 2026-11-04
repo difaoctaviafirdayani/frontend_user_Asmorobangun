@@ -248,6 +248,11 @@ class TopengOrder {
         paymentMethod: j['paymentMethod'] == null ? null : _s(j['paymentMethod']),
         proofFile: j['proofFile'] == null ? null : _s(j['proofFile']),
       );
+
+  bool get isCancelled => status == 'dibatalkan';
+
+  bool get awaitingPayment =>
+      (proofFile ?? '').isEmpty && paymentMethod != 'cash' && status == 'menunggu_konfirmasi_admin';
 }
 
 class SearchHit {

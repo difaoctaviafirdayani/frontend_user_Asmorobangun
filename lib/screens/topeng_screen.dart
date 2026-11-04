@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/format.dart';
@@ -134,7 +133,7 @@ class _TopengBodyState extends State<_TopengBody> {
     final full = _fullPhone;
     if (full.isEmpty) return 'Nomor WhatsApp wajib diisi';
     if (_dial == '62') return Validators.phone(full, required: true);
-    final n = full.length - 1 - _dial.length; // jumlah digit nomor
+    final n = full.length - 1 - _dial.length;
     if (n < 6 || n > 14) return 'Nomor tidak valid';
     return null;
   }
@@ -353,18 +352,19 @@ class OrderDetailScreen extends StatelessWidget {
   final String orderId;
   const OrderDetailScreen({super.key, required this.orderId});
 
-  Widget _section(String text) => Padding(
-        padding: const EdgeInsets.only(top: 24, bottom: 10),
-        child: Text(text, style: headingStyle(size: 22, color: AppColors.wood700)),
+  Widget _section(String text, {double top = 24}) => Padding(
+        padding: EdgeInsets.only(top: top, bottom: 10),
+        child: Text(text, style: headingStyle(size: 20, color: AppColors.wood700)),
       );
 
-  Widget _box({required Widget child, EdgeInsetsGeometry padding = const EdgeInsets.all(16)}) => Container(
+  Widget _box({required Widget child, EdgeInsetsGeometry padding = const EdgeInsets.all(14), Color color = Colors.white}) =>
+      Container(
         width: double.infinity,
         padding: padding,
         decoration: BoxDecoration(
-          color: _topengFill,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.wood700, width: 1.2),
+          color: color,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.wood700, width: 1),
         ),
         child: child,
       );
@@ -372,12 +372,10 @@ class OrderDetailScreen extends StatelessWidget {
   Widget _row(String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(flex: 4, child: Text(label, style: const TextStyle(color: AppColors.wood700, fontSize: 14))),
+          Expanded(flex: 4, child: Text(label, style: const TextStyle(color: AppColors.wood900, fontSize: 13))),
           Expanded(
             flex: 6,
-            child: Text(value,
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.wood700)),
+            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.wood900)),
           ),
         ]),
       );
@@ -385,63 +383,48 @@ class OrderDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: 'Pesanan topeng',
+      title: 'Katalog Topeng Malangan',
       backgroundColor: Colors.white,
       floatingActionButton: topengAiButton(context),
       body: AsyncView<TopengOrder>(
         loader: () async => TopengOrder.fromJson((await api.get('/topeng/orders/$orderId'))['order'] as Map<String, dynamic>),
         builder: (context, o, reload) => ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
-          Text(o.topengName, style: headingStyle(size: 26, color: AppColors.wood700)),
-          const SizedBox(height: 12),
+          Text('Detail Transaksi', style: headingStyle(size: 20, color: AppColors.wood700)),
+          const SizedBox(height: 10),
           _box(
-            child: Column(children: [
-              _row('Jumlah', '${o.qty}'),
-              _row('Harga satuan', formatRupiah(o.unitPrice)),
-              _row('Total', formatRupiah(o.total)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: StatusChip(o.status),
+              ),
+              _row('Nama Pesanan', o.topengName),
+              _row('Jumlah Pesanan', '${o.qty}'),
               if ((o.customName ?? '').isNotEmpty) _row('Nama custom', o.customName!),
               if ((o.customDesign ?? '').isNotEmpty) _row('Desain custom', o.customDesign!),
-              if (o.message.isNotEmpty) _row('Catatan', o.message),
+              _row('Catatan Tambahan', o.message.isEmpty ? '-' : o.message),
+              _row('Total Pembayaran', formatRupiah(o.total)),
               _row('Dipesan', formatDate(o.createdAt)),
-              const SizedBox(height: 8),
-              Align(alignment: Alignment.centerLeft, child: StatusChip(o.status)),
             ]),
           ),
-          if (o.chatLog.isNotEmpty) ...[
-            _section('Riwayat pesanan'),
-            for (final m in o.chatLog)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _box(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(m.text, style: const TextStyle(height: 1.45, fontSize: 15, color: AppColors.wood700)),
-                    const SizedBox(height: 4),
-                    Text(formatDate(m.date), style: const TextStyle(color: AppColors.wood700, fontSize: 12.5)),
-                  ]),
-                ),
-              ),
-          ],
           _section('Pembayaran'),
-          PaymentSection(
-            kind: 'topeng',
-            id: o.id,
-            amount: o.total,
-            existingProof: o.proofFile,
-            existingMethod: o.paymentMethod,
-            onDone: reload,
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.wood700,
-              side: const BorderSide(color: AppColors.wood700, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+          if (o.isCancelled)
+            const NoticeBox(child: Text('Pesanan ini dibatalkan karena tidak dibayar dalam 24 jam. Silakan buat pesanan baru.'))
+          else ...[
+            if (o.awaitingPayment)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 10),
+                child: Text('Selesaikan pembayaran dalam 24 jam, atau pesanan akan dibatalkan otomatis.',
+                    style: TextStyle(fontSize: 12.5, color: AppColors.wood800)),
+              ),
+            PaymentSection(
+              kind: 'topeng',
+              id: o.id,
+              amount: o.total,
+              existingProof: o.proofFile,
+              existingMethod: o.paymentMethod,
+              onDone: reload,
             ),
-            onPressed: () => openUrl(context, waUrl('Halo admin, saya ingin menanyakan pesanan ${o.topengName} (${o.id}).')),
-            icon: const Icon(Icons.chat_outlined),
-            label: const Text('Tanya admin via WhatsApp'),
-          ),
+          ],
         ]),
       ),
     );

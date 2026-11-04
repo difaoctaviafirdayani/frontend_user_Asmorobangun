@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../core/api.dart';
 import '../core/format.dart';
 import '../core/picker.dart';
@@ -110,9 +109,11 @@ class _PaymentSectionState extends State<PaymentSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.existingProof != null && widget.existingProof!.isNotEmpty) return _proofDone();
+    if (widget.existingProof != null && widget.existingProof!.isNotEmpty) {
+      return _topeng ? _topengDone() : _proofDone();
+    }
     if (widget.kind != 'topeng' && widget.existingMethod == 'cash' && !_changing) return _cashDone();
-    return _picker();
+    return _topeng ? _topengPicker() : _picker();
   }
 
   bool get _topeng => widget.kind == 'topeng';
@@ -206,6 +207,190 @@ class _PaymentSectionState extends State<PaymentSection> {
     );
   }
 
+
+  static const _fill = Color(0xFFFDFBE8);
+  static const _brownBtn = Color(0xFF5C3724);
+
+  BoxDecoration _topengBox({Color color = _fill, double radius = 14}) => BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: AppColors.wood700, width: 1),
+      );
+
+  Widget _topengDone() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: _topengBox(),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.check_circle_outline_rounded, color: AppColors.wood900, size: 22),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Bukti pembayaran terkirim',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.wood900)),
+                const SizedBox(height: 2),
+                Text('Metode: ${methodLabel(widget.existingMethod)} - Menunggu verifikasi admin',
+                    style: const TextStyle(fontSize: 12.5, color: AppColors.wood800)),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brownBtn,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: () => openUrl(context, assetUrl(widget.existingProof)),
+              child: const Text('Lihat Bukti yang diunggah', style: TextStyle(fontSize: 14)),
+            ),
+          ),
+        ]),
+      );
+
+  Widget _topengPicker() {
+    final methods = _available;
+    if (methods.isEmpty) {
+      return const AppCard(child: EmptyState('Belum ada metode pembayaran yang aktif. Silakan hubungi admin sanggar.'));
+    }
+    final current = _method ?? methods.first;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      decoration: _topengBox(),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Pilih Metode Pembayaran',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.wood900)),
+        const SizedBox(height: 10),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (final m in methods)
+            InkWell(
+              onTap: _busy ? null : () => _select(m),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(current == m ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                      size: 20, color: AppColors.wood900),
+                  const SizedBox(width: 6),
+                  Text(methodLabel(m),
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: current == m ? FontWeight.w700 : FontWeight.w400,
+                          color: AppColors.wood900)),
+                ]),
+              ),
+            ),
+        ]),
+        const SizedBox(height: 12),
+        _onlineArea(current),
+      ]),
+    );
+  }
+
+  Widget _topengQris(Map<String, dynamic> data, int? amount) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 260),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: _topengBox(color: Colors.white, radius: 12),
+            child: Column(children: [
+              NetImage(src: data['qris']?.toString(), height: 220, fit: BoxFit.contain),
+              if (amount != null) ...[
+                const SizedBox(height: 8),
+                Text(formatRupiah(amount),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.wood900)),
+              ],
+            ]),
+          ),
+        ),
+      );
+
+  Widget _kv(String k, String v, {Widget? trailing}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(flex: 4, child: Text(k, style: const TextStyle(fontSize: 12.5, color: AppColors.wood900))),
+          Expanded(
+            flex: 6,
+            child: Row(children: [
+              Flexible(child: Text(v, style: const TextStyle(fontSize: 12.5, color: AppColors.wood800))),
+              if (trailing != null) trailing,
+            ]),
+          ),
+        ]),
+      );
+
+  Widget _topengTransfer(Map<String, dynamic> data, int? amount) {
+    final note = (data['note'] ?? '').toString();
+    final bank = data['bank'] is Map ? data['bank'] as Map : const {};
+    final account = (bank['accountNumber'] ?? '').toString();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFFFFEDCB), borderRadius: BorderRadius.circular(10)),
+      child: Column(children: [
+        if (note.isNotEmpty)
+          _kv('Info transfer', note)
+        else ...[
+          _kv('Bank', (bank['bankName'] ?? '-').toString()),
+          _kv(
+            'No. Rekening',
+            account.isEmpty ? '-' : account,
+            trailing: account.isEmpty
+                ? null
+                : InkWell(
+                    borderRadius: BorderRadius.circular(6),
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: account.replaceAll(RegExp(r'[^0-9]'), '')));
+                      showSnack(context, 'Nomor rekening disalin.');
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Tooltip(message: 'Salin no. rekening', child: Icon(Icons.copy_rounded, size: 15, color: AppColors.wood800)),
+                    ),
+                  ),
+          ),
+          _kv('Nama Pemilik', (bank['accountName'] ?? '-').toString()),
+        ],
+        if (amount != null) _kv('Nominal', formatRupiah(amount)),
+      ]),
+    );
+  }
+
+  Widget _topengUpload(String method) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(height: 14),
+        const Text('Unggah Bukti Pembayaran',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.wood900)),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.wood900,
+            side: const BorderSide(color: AppColors.wood700, width: 1),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          onPressed: _busy ? null : _pick,
+          icon: const Icon(Icons.file_upload_outlined, size: 18),
+          label: Text(_picked == null ? 'Pilih Gambar' : _picked!.name,
+              overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400)),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _brownBtn,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          onPressed: _busy ? null : () => _uploadProof(method),
+          child: Text(_busy ? 'Mengirim...' : 'Kirim', style: const TextStyle(fontSize: 14)),
+        ),
+      ]);
+
   Widget _cashArea() {
     final cfg = widget.methods['cash'];
     final note = cfg is Map ? (cfg['note'] ?? '').toString() : '';
@@ -233,6 +418,12 @@ class _PaymentSectionState extends State<PaymentSection> {
         if (snap.hasError) return Text(snap.error.toString(), style: const TextStyle(color: AppColors.danger));
         final data = snap.data ?? {};
         final amount = data['amount'] is num ? (data['amount'] as num).toInt() : widget.amount;
+        if (_topeng) {
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (method == 'qris') _topengQris(data, amount) else _topengTransfer(data, amount),
+            _topengUpload(method),
+          ]);
+        }
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (method == 'qris') _qris(data, amount) else _transfer(data, amount),
           const SizedBox(height: 14),

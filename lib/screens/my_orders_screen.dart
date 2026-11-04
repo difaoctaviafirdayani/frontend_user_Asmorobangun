@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../core/api.dart';
 import '../core/format.dart';
 import '../core/routes.dart';
@@ -8,9 +7,6 @@ import '../models/models.dart';
 import '../widgets/common.dart';
 import '../widgets/payment_section.dart';
 
-/// Halaman ini hanya bisa dibuka lewat rute bernama Routes.myOrders,
-/// yang sudah dijaga AppRouter (harus login). Server juga hanya mengembalikan
-/// pesanan milik pemilik token (/orders/mine, /bookings/mine).
 class MyOrdersScreen extends StatelessWidget {
   const MyOrdersScreen({super.key});
 
@@ -56,7 +52,6 @@ class _TopengOrdersTab extends StatelessWidget {
               final o = items[i];
               return AppCard(
                 padding: const EdgeInsets.all(12),
-                // Navigator rute bernama + argumen; kembali dari detail menyegarkan daftar.
                 onTap: () => Navigator.pushNamed(context, Routes.order, arguments: o.id).then((_) => reload()),
                 child: Row(children: [
                   NetImage(src: o.topengImage, width: 56, height: 56, radius: BorderRadius.circular(12)),
@@ -127,7 +122,6 @@ class _BookingsTab extends StatelessWidget {
   }
 }
 
-/// Melanjutkan pembayaran booking yang masih "menunggu pembayaran".
 class BookingPaymentScreen extends StatelessWidget {
   final Booking booking;
   const BookingPaymentScreen({super.key, required this.booking});
