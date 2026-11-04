@@ -29,7 +29,7 @@ class AppConfig {
   }
 
   /// Cadangan bila pengaturan WhatsApp dari server belum terbaca.
-  static const String adminWhatsapp = '6281234567890';
+  static const String adminWhatsapp = '628175404437';
 
   static const String sanggarName = 'Sanggar Asmorobangun';
   static const String sanggarAddress =

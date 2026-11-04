@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/picker.dart';
@@ -8,7 +7,6 @@ import '../core/routes.dart';
 import '../core/theme.dart';
 import '../widgets/common.dart';
 import 'auth_screens.dart';
-import 'search_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -18,13 +16,16 @@ class ProfileScreen extends StatelessWidget {
     final auth = context.watch<AuthState>();
     if (!auth.isLoggedIn) return const LoginScreen(embedded: true);
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: appBarBack(context),
-        title: const Text('Akun', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        automaticallyImplyLeading: false,
+        centerTitle: false,
+        titleSpacing: 20,
+        title: Text('Akun Saya', style: headingStyle(size: 20, color: AppColors.cream100)),
         backgroundColor: AppColors.wood900,
         foregroundColor: AppColors.cream100,
         elevation: 0,
-        actions: [searchAction(context)],
+        scrolledUnderElevation: 0,
       ),
       body: const _ProfileBody(),
     );
@@ -40,19 +41,17 @@ class _ProfileBody extends StatefulWidget {
 
 class _ProfileBodyState extends State<_ProfileBody> {
   bool _busy = false;
-  static const _maxAvatarBytes = 3 * 1024 * 1024; // sama dengan batas server (3MB)
+  static const _maxAvatarBytes = 3 * 1024 * 1024;
 
   Future<void> _changeAvatar() async {
     final f = await pickImageFile();
     if (f == null) return;
-    // Lapisan 1: validasi UI (ukuran) sebelum mengunggah
     if (f.bytes.length > _maxAvatarBytes) {
       if (mounted) showSnack(context, 'Ukuran foto maksimal 3MB.');
       return;
     }
     setState(() => _busy = true);
     try {
-      // Lapisan 2/3/4: server memeriksa token, tipe & ukuran file, lalu hanya mengubah akun pemilik token
       final res = await api.upload('/auth/me/avatar', field: 'avatar', bytes: f.bytes, filename: f.name);
       if (!mounted) return;
       await context.read<AuthState>().setUserFromResponse(res);
@@ -80,68 +79,89 @@ class _ProfileBodyState extends State<_ProfileBody> {
 
   Future<void> _logout() async {
     if (!await confirmDialog(context, 'Keluar dari akun ini?', okLabel: 'Keluar')) return;
-    // Token dihapus dari penyimpanan terenkripsi. Pembersihan tumpukan halaman
-    // ditangani listener di main.dart (pushNamedAndRemoveUntil).
     await context.read<AuthState>().logout();
   }
+
+  Widget _menuRow({required Widget icon, required Widget label, VoidCallback? onTap}) => InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(children: [
+            SizedBox(width: 28, child: Center(child: icon)),
+            const SizedBox(width: 12),
+            Expanded(child: label),
+          ]),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthState>().user!;
     final hasAvatar = (user.avatar ?? '').isNotEmpty;
     final initial = user.name.trim().isEmpty ? '?' : user.name.trim()[0].toUpperCase();
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      AppCard(
-        child: Column(children: [
-          const SizedBox(height: 4),
-          Stack(alignment: Alignment.bottomRight, children: [
-            CircleAvatar(
-              radius: 46,
-              backgroundColor: AppColors.wood800,
-              child: hasAvatar
-                  ? ClipOval(child: NetImage(src: user.avatar, width: 92, height: 92))
-                  : Text(initial, style: const TextStyle(fontSize: 34, color: AppColors.gold300, fontWeight: FontWeight.w800)),
-            ),
-            Material(
-              color: AppColors.gold400,
-              shape: const CircleBorder(),
+    const menuText = TextStyle(fontSize: 14, color: AppColors.wood900);
+    return ListView(padding: const EdgeInsets.fromLTRB(24, 20, 24, 24), children: [
+      Center(
+        child: Stack(clipBehavior: Clip.none, children: [
+          CircleAvatar(
+            radius: 48,
+            backgroundColor: AppColors.wood700,
+            child: hasAvatar
+                ? ClipOval(child: NetImage(src: user.avatar, width: 96, height: 96))
+                : Text(initial, style: const TextStyle(fontSize: 34, color: Colors.white, fontWeight: FontWeight.w500)),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 2,
+            child: Material(
+              color: Colors.white,
+              shape: const CircleBorder(side: BorderSide(color: AppColors.line)),
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: _busy ? null : _changeAvatar,
-                child: const Padding(padding: EdgeInsets.all(8), child: Icon(Icons.camera_alt_outlined, size: 18, color: AppColors.wood950)),
+                child: const Padding(padding: EdgeInsets.all(5), child: Icon(Icons.edit_outlined, size: 14, color: AppColors.wood700)),
               ),
             ),
-          ]),
-          const SizedBox(height: 12),
-          Text(user.name, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.wood900)),
-          const SizedBox(height: 2),
-          Text(user.email, style: const TextStyle(color: AppColors.inkSoft)),
-          if (user.phone.isNotEmpty) Text(user.phone, style: const TextStyle(color: AppColors.inkSoft)),
-          if (hasAvatar) TextButton(onPressed: _busy ? null : _removeAvatar, child: const Text('Hapus foto profil')),
-          if (_busy) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator(color: AppColors.gold400)),
+          ),
         ]),
       ),
-      const SizedBox(height: 12),
-      // Otorisasi (sisi klien): akun admin hanya diberi petunjuk, bukan akses kelola di aplikasi ini.
+      const SizedBox(height: 10),
+      Center(child: Text(user.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.wood900))),
+      Center(child: Text(user.email, style: const TextStyle(fontSize: 12, color: AppColors.wood800))),
+      if (hasAvatar)
+        Center(
+          child: TextButton(
+            onPressed: _busy ? null : _removeAvatar,
+            style: TextButton.styleFrom(visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 12)),
+            child: const Text('Hapus foto profil'),
+          ),
+        ),
+      if (_busy) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator(color: AppColors.wood700)),
+      const SizedBox(height: 20),
       if (user.role == 'admin')
-        const NoticeBox(child: Text('Kamu masuk sebagai admin sanggar. Untuk mengelola data, gunakan dashboard admin di web.')),
-      AppCard(
-        padding: EdgeInsets.zero,
-        child: Column(children: [
-          ListTile(
-            leading: const Icon(Icons.receipt_long_outlined, color: AppColors.wood700),
-            title: const Text('Pesanan Saya', style: TextStyle(fontWeight: FontWeight.w600)),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            // Rute bernama yang dijaga AppRouter
-            onTap: () => Navigator.pushNamed(context, Routes.myOrders),
-          ),
-          const Divider(height: 1, color: AppColors.line),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded, color: AppColors.danger),
-            title: const Text('Keluar', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.danger)),
-            onTap: _logout,
-          ),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: NoticeBox(child: Text('Kamu masuk sebagai admin sanggar. Untuk mengelola data, gunakan dashboard admin di web.')),
+        ),
+      _menuRow(
+        icon: const Icon(Icons.shopping_cart_outlined, color: AppColors.wood900, size: 24),
+        label: const Text('Pesanan Saya', style: menuText),
+        onTap: () => Navigator.pushNamed(context, Routes.myOrders),
+      ),
+      const Divider(height: 1, thickness: 1, color: AppColors.wood700),
+      _menuRow(
+        icon: const Stack(alignment: Alignment.center, children: [
+          Icon(Icons.circle_outlined, color: AppColors.wood900, size: 26),
+          Icon(Icons.phone, color: AppColors.wood900, size: 13),
         ]),
+        label: const Text('Hubungi Admin (WhatsApp)', style: TextStyle(fontSize: 14, color: AppColors.wood900, decoration: TextDecoration.underline, decorationColor: AppColors.wood900)),
+        onTap: () => openUrl(context, waUrl()),
+      ),
+      const Divider(height: 1, thickness: 1, color: AppColors.line),
+      _menuRow(
+        icon: const Icon(Icons.logout_rounded, color: AppColors.danger, size: 24),
+        label: const Text('Keluar', style: TextStyle(fontSize: 14, color: AppColors.danger)),
+        onTap: _logout,
       ),
     ]);
   }
