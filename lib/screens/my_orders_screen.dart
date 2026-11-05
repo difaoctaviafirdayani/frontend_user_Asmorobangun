@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../core/api.dart';
 import '../core/format.dart';
 import '../core/routes.dart';
@@ -6,7 +7,17 @@ import '../core/theme.dart';
 import '../models/models.dart';
 import '../widgets/common.dart';
 import '../widgets/payment_section.dart';
+import '../widgets/reviews.dart';
 
+const _cardFill = Color(0xFFFDFBE8);
+const _brownBtn = Color(0xFF5C3724);
+
+/// Halaman ini hanya bisa dibuka lewat rute bernama Routes.myOrders,
+/// yang sudah dijaga AppRouter (harus login). Server juga hanya mengembalikan
+/// pesanan milik pemilik token (/orders/mine, /bookings/mine).
+///
+/// Ulasan hanya bisa ditulis dari sini, setelah pesanan topeng atau booking
+/// berstatus "selesai". Ulasan yang sudah dikirim bisa diedit atau dihapus.
 class MyOrdersScreen extends StatelessWidget {
   const MyOrdersScreen({super.key});
 
@@ -15,22 +26,161 @@ class MyOrdersScreen extends StatelessWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('Pesanan Saya', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+          title: Text('Pesanan Saya', style: headingStyle(size: 20, color: AppColors.cream100)),
           backgroundColor: AppColors.wood900,
           foregroundColor: AppColors.cream100,
           elevation: 0,
-          bottom: const TabBar(
-            indicatorColor: AppColors.gold300,
-            labelColor: AppColors.gold300,
-            unselectedLabelColor: AppColors.cream200,
-            tabs: [Tab(text: 'Pesanan Topeng'), Tab(text: 'Pendaftaran & Booking')],
-          ),
+          scrolledUnderElevation: 0,
         ),
-        body: const TabBarView(children: [_TopengOrdersTab(), _BookingsTab()]),
+        body: const Column(children: [
+          _PillTabs(),
+          Expanded(child: TabBarView(children: [_TopengOrdersTab(), _BookingsTab()])),
+        ]),
       ),
     );
   }
+}
+
+/// Dua tab berbentuk pil (sesuai desain).
+class _PillTabs extends StatelessWidget {
+  const _PillTabs();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = DefaultTabController.of(context);
+    const labels = ['Pesanan Topeng', 'Pendaftaran dan Booking'];
+    return AnimatedBuilder(
+      animation: c.animation!,
+      builder: (context, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+        child: Row(children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Flexible(
+              child: GestureDetector(
+                onTap: () => c.animateTo(i),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: c.index == i ? _brownBtn : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.wood700, width: 1),
+                  ),
+                  child: Text(labels[i],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: c.index == i ? Colors.white : AppColors.wood700)),
+                ),
+              ),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+/// Kartu pesanan/booking: status di kiri atas, tanggal di kanan atas,
+/// judul dan harga, lalu tombol kecil di kanan bawah.
+class _OrderCard extends StatelessWidget {
+  final String status, title, date;
+  final String? price;
+  final VoidCallback? onTap;
+  final List<Widget> actions;
+  final String? hint;
+  const _OrderCard({
+    required this.status,
+    required this.title,
+    required this.date,
+    this.price,
+    this.onTap,
+    this.actions = const [],
+    this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _cardFill,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: AppColors.wood700, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              StatusChip(status),
+              const Spacer(),
+              Text(date, style: const TextStyle(fontSize: 11.5, color: AppColors.wood700)),
+            ]),
+            const SizedBox(height: 8),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.wood900)),
+            if (price != null) ...[
+              const SizedBox(height: 2),
+              Text(price!, style: const TextStyle(fontSize: 13, color: AppColors.wood800)),
+            ],
+            if (hint != null) ...[
+              const SizedBox(height: 6),
+              Text(hint!, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.wood700)),
+            ],
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Align(alignment: Alignment.centerRight, child: Wrap(spacing: 8, children: actions)),
+            ],
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _smallButton(String label, VoidCallback onPressed, {bool filled = false}) => SizedBox(
+      height: 30,
+      child: filled
+          ? ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brownBtn,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: onPressed,
+              child: Text(label, style: const TextStyle(fontSize: 12)),
+            )
+          : OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.wood900,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                side: const BorderSide(color: AppColors.wood700, width: 1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: onPressed,
+              child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w400)),
+            ),
+    );
+
+/// Tombol ulasan: hanya muncul bila pesanan sudah selesai.
+/// Belum ada ulasan -> "Beri Ulasan". Sudah ada -> "Edit Ulasan" (bisa hapus di dialog).
+Widget? _reviewButton(BuildContext context, {required String status, required Review? review, required String path, required VoidCallback reload}) {
+  if (status != 'selesai') return null;
+  return _smallButton(
+    review == null ? 'Beri Ulasan' : 'Edit Ulasan',
+    () async {
+      final changed = await showReviewDialog(context, basePath: path, existing: review);
+      if (changed) reload();
+    },
+    filled: review == null,
+  );
 }
 
 class _TopengOrdersTab extends StatelessWidget {
@@ -50,22 +200,16 @@ class _TopengOrdersTab extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, i) {
               final o = items[i];
-              return AppCard(
-                padding: const EdgeInsets.all(12),
+              final review = _reviewButton(context,
+                  status: o.status, review: o.review, path: '/topeng/orders/${o.id}/review', reload: reload);
+              return _OrderCard(
+                status: o.status,
+                title: '${o.topengName} (${o.qty} pcs)',
+                price: formatRupiah(o.total),
+                date: formatDateLong(o.createdAt),
+                // Navigator rute bernama + argumen; kembali dari detail menyegarkan daftar.
                 onTap: () => Navigator.pushNamed(context, Routes.order, arguments: o.id).then((_) => reload()),
-                child: Row(children: [
-                  NetImage(src: o.topengImage, width: 56, height: 56, radius: BorderRadius.circular(12)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${o.topengName} x${o.qty}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text('${formatRupiah(o.total)} · ${formatDate(o.createdAt)}', style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5)),
-                      const SizedBox(height: 6),
-                      StatusChip(o.status),
-                    ]),
-                  ),
-                ]),
+                actions: [if (review != null) review],
               );
             },
           ),
@@ -93,26 +237,18 @@ class _BookingsTab extends StatelessWidget {
             itemBuilder: (context, i) {
               final b = items[i];
               final needsPayment = b.status == 'menunggu_pembayaran';
-              return AppCard(
+              final review = _reviewButton(context,
+                  status: b.status, review: b.review, path: '/bookings/${b.id}/review', reload: reload);
+              return _OrderCard(
+                status: b.status,
+                title: b.facilityName,
+                price: b.amount != null ? formatRupiah(b.amount) : null,
+                date: (b.date ?? '').isNotEmpty ? formatDateLong(b.date) : formatDateLong(b.createdAt),
+                hint: needsPayment ? 'Ketuk untuk bayar' : null,
                 onTap: needsPayment
                     ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => BookingPaymentScreen(booking: b))).then((_) => reload())
                     : null,
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(b.facilityName, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text(
-                    [if ((b.date ?? '').isNotEmpty) formatDate(b.date), if (b.amount != null) formatRupiah(b.amount)].join(' · '),
-                    style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    StatusChip(b.status),
-                    if (needsPayment) ...[
-                      const Spacer(),
-                      const Text('Ketuk untuk bayar', style: TextStyle(color: AppColors.wood700, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                    ],
-                  ]),
-                ]),
+                actions: [if (review != null) review],
               );
             },
           ),
@@ -122,6 +258,7 @@ class _BookingsTab extends StatelessWidget {
   }
 }
 
+/// Melanjutkan pembayaran booking yang masih "menunggu pembayaran".
 class BookingPaymentScreen extends StatelessWidget {
   final Booking booking;
   const BookingPaymentScreen({super.key, required this.booking});

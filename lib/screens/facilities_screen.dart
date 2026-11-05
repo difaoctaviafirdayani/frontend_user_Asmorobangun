@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/format.dart';
@@ -9,6 +10,7 @@ import '../models/models.dart';
 import '../widgets/auth_ui.dart';
 import '../widgets/common.dart';
 import '../widgets/payment_section.dart';
+import '../widgets/reviews.dart';
 import 'auth_screens.dart';
 
 const _cardColor = Color(0xFFFDFAE8);
@@ -65,6 +67,7 @@ class FacilityTile extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: LayoutBuilder(builder: (context, c) {
+            // Foto di kiri dan tingginya mengikuti tinggi card (penuh), teks di kanan.
             final narrow = c.maxWidth < 600;
             final imageW = c.maxWidth * (narrow ? 0.54 : 0.52);
             const gap = 12.0;
@@ -242,19 +245,9 @@ class _FacilityBody extends StatelessWidget {
           ],
         ),
         BookingForm(facility: f),
-        const _Heading('Ulasan'),
-        ReviewForm(facilityId: f.id, onSubmitted: reload),
-        if (data.reviews.isEmpty)
-          const EmptyState(
-            'Jadilah yang pertama memberi ulasan.',
-            icon: Icons.rate_review_outlined,
-          )
-        else
-          for (var i = 0; i < data.reviews.length; i++)
-            _ReviewItem(
-              review: data.reviews[i],
-              showDivider: i < data.reviews.length - 1,
-            ),
+        // Ulasan hanya dibaca di sini. Menulis ulasan dilakukan dari Pesanan Saya.
+        const SizedBox(height: 20),
+        ReviewList(data.reviews),
       ],
     );
   }
@@ -333,201 +326,6 @@ class _LoginNotice extends StatelessWidget {
           ),
         ),
       );
-}
-
-class _StarRow extends StatelessWidget {
-  final int value;
-  final double size;
-  const _StarRow(this.value, {this.size = 20});
-
-  @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 1; i <= 5; i++)
-            Icon(
-              i <= value ? Icons.star_rounded : Icons.star_border_rounded,
-              size: size,
-              color: AppColors.gold400,
-            ),
-        ],
-      );
-}
-
-class _ReviewItem extends StatelessWidget {
-  final Review review;
-  final bool showDivider;
-  const _ReviewItem({required this.review, required this.showDivider});
-
-  @override
-  Widget build(BuildContext context) {
-    final r = review;
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  r.userName,
-                  style: const TextStyle(
-                    color: AppColors.wood800,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text(
-                formatDateLong(r.date),
-                style: const TextStyle(
-                  color: AppColors.wood700,
-                  fontSize: 11.5,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          _StarRow(r.rating),
-          const SizedBox(height: 4),
-          Text(
-            r.comment,
-            style: const TextStyle(
-              color: AppColors.wood800,
-              fontSize: 13.5,
-              height: 1.45,
-            ),
-          ),
-          if (showDivider)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Divider(height: 1, thickness: 1, color: AppColors.wood700),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class SectionHeaderInline extends StatelessWidget {
-  final String text;
-  const SectionHeaderInline(this.text, {super.key});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 22, bottom: 10),
-        child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.wood900)),
-      );
-}
-
-class ReviewForm extends StatefulWidget {
-  final String facilityId;
-  final VoidCallback onSubmitted;
-  const ReviewForm({super.key, required this.facilityId, required this.onSubmitted});
-
-  @override
-  State<ReviewForm> createState() => _ReviewFormState();
-}
-
-class _ReviewFormState extends State<ReviewForm> {
-  final _formKey = GlobalKey<FormState>();
-  final _comment = TextEditingController();
-  int _rating = 0;
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _comment.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_rating < 1) {
-      showSnack(context, 'Pilih jumlah bintang dulu ya.');
-      return;
-    }
-    if (!_formKey.currentState!.validate()) return;
-    if (!await ensureLogin(context)) return;
-    setState(() => _busy = true);
-    try {
-      await api.post('/facilities/${widget.facilityId}/reviews',
-          body: {'rating': _rating, 'comment': Validators.clean(_comment.text)});
-      if (!mounted) return;
-      showSnack(context, 'Ulasan terkirim, makasih!');
-      widget.onSubmitted();
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final loggedIn = context.watch<AuthState>().isLoggedIn;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: _Gate(
-        enabled: loggedIn,
-        child: _FormCard(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Rating Anda',
-                  style: TextStyle(
-                    color: AppColors.wood700,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    for (var n = 1; n <= 5; n++)
-                      GestureDetector(
-                        onTap: () => setState(() => _rating = n),
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Icon(
-                            n <= _rating
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            size: 32,
-                            color: n <= _rating
-                                ? AppColors.gold400
-                                : AppColors.wood800,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                AuthField(
-                  label: 'Komentar',
-                  hint: 'Tulis komentar Anda di sini',
-                  controller: _comment,
-                  minLines: 1,
-                  maxLines: 4,
-                  inputFormatters: InputFormats.maxLen(500),
-                  validator: Validators.text('Komentar', min: 3, max: 500),
-                ),
-                AuthButton(
-                  label: 'Kirim Ulasan',
-                  busy: _busy,
-                  onPressed: _submit,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class BookingForm extends StatefulWidget {

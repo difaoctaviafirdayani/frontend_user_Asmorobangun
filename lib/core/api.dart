@@ -65,6 +65,9 @@ class ApiClient {
   Future<Map<String, dynamic>> post(String path, {Object? body}) => _send(
       () => http.post(_uri(path), headers: _headers(), body: jsonEncode(body ?? {})));
 
+    Future<Map<String, dynamic>> put(String path, {Object? body}) => _send(
+      () => http.put(_uri(path), headers: _headers(), body: jsonEncode(body ?? {})));
+
   Future<Map<String, dynamic>> patch(String path, {Object? body}) => _send(
       () => http.patch(_uri(path), headers: _headers(), body: jsonEncode(body ?? {})));
 

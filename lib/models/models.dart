@@ -63,20 +63,26 @@ class Facility {
 class Review {
   final String id, userName, comment, date;
   final int rating;
-  Review({required this.id, required this.userName, required this.comment, required this.date, required this.rating});
+  final String? image;
+  Review({required this.id, required this.userName, required this.comment, required this.date, required this.rating, this.image});
   factory Review.fromJson(Map<String, dynamic> j) => Review(
         id: _s(j['id']),
         userName: _s(j['userName']),
         comment: _s(j['comment']),
         date: _s(j['date']),
         rating: _i(j['rating']),
+        image: _s(j['image']).isEmpty ? null : _s(j['image']),
       );
 }
+
+Review? _reviewOrNull(dynamic v) => v is Map<String, dynamic> ? Review.fromJson(v) : null;
 
 class Topeng {
   final String id, name, character, color, image, desc;
   final int price;
-    Topeng({required this.id, required this.name, required this.character, required this.color, required this.image, required this.desc, required this.price});
+  final double? avgRating;
+  final int reviewCount;
+  Topeng({required this.id, required this.name, required this.character, required this.color, required this.image, required this.desc, required this.price, this.avgRating, this.reviewCount = 0});
   factory Topeng.fromJson(Map<String, dynamic> j) => Topeng(
         id: _s(j['id']),
         name: _s(j['name']),
@@ -85,6 +91,8 @@ class Topeng {
         image: _s(j['image']),
         desc: _s(j['desc']),
         price: _i(j['price']),
+        avgRating: _dn(j['avgRating']),
+        reviewCount: _i(j['reviewCount']),
       );
 }
 
@@ -170,6 +178,7 @@ class Booking {
   final String id, facilityId, facilityName, bookingType, notes, status, createdAt;
   final String? date, eventType, location, paymentMethod, proofFile;
   final int? amount;
+  final Review? review;
   Booking({
     required this.id,
     required this.facilityId,
@@ -184,6 +193,7 @@ class Booking {
     this.paymentMethod,
     this.proofFile,
     this.amount,
+    this.review,
   });
   factory Booking.fromJson(Map<String, dynamic> j) => Booking(
         id: _s(j['id']),
@@ -199,6 +209,7 @@ class Booking {
         paymentMethod: j['paymentMethod'] == null ? null : _s(j['paymentMethod']),
         proofFile: j['proofFile'] == null ? null : _s(j['proofFile']),
         amount: _in(j['amount']),
+        review: _reviewOrNull(j['review']),
       );
 }
 
@@ -214,6 +225,7 @@ class TopengOrder {
   final int qty, unitPrice, total;
   final String? customName, customDesign, paymentMethod, proofFile;
   final List<ChatMsg> chatLog;
+  final Review? review;
   TopengOrder({
     required this.id,
     required this.topengId,
@@ -230,6 +242,7 @@ class TopengOrder {
     this.customDesign,
     this.paymentMethod,
     this.proofFile,
+    this.review,
   });
   factory TopengOrder.fromJson(Map<String, dynamic> j) => TopengOrder(
         id: _s(j['id']),
@@ -247,10 +260,13 @@ class TopengOrder {
         customDesign: j['customDesign'] == null ? null : _s(j['customDesign']),
         paymentMethod: j['paymentMethod'] == null ? null : _s(j['paymentMethod']),
         proofFile: j['proofFile'] == null ? null : _s(j['proofFile']),
+        review: _reviewOrNull(j['review']),
       );
 
+  /// Dibatalkan otomatis oleh server bila belum dibayar dalam 24 jam.
   bool get isCancelled => status == 'dibatalkan';
 
+  /// Belum ada bukti bayar, belum memilih tunai, dan masih menunggu.
   bool get awaitingPayment =>
       (proofFile ?? '').isEmpty && paymentMethod != 'cash' && status == 'menunggu_konfirmasi_admin';
 }

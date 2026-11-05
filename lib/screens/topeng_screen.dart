@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/format.dart';
@@ -9,6 +10,7 @@ import '../core/validators.dart';
 import '../models/models.dart';
 import '../widgets/common.dart';
 import '../widgets/payment_section.dart';
+import '../widgets/reviews.dart';
 import 'auth_screens.dart';
 
 Widget topengAiButton(BuildContext context) => FloatingActionButton(
@@ -99,9 +101,12 @@ class TopengDetailScreen extends StatelessWidget {
       title: 'Katalog Topeng Malangan',
       backgroundColor: Colors.white,
       floatingActionButton: topengAiButton(context),
-      body: AsyncView<Topeng>(
-        loader: () async => Topeng.fromJson((await api.get('/topeng/$id'))['topeng'] as Map<String, dynamic>),
-        builder: (context, t, _) => _TopengBody(topeng: t),
+      body: AsyncView<(Topeng, List<Review>)>(
+        loader: () async {
+          final res = await api.get('/topeng/$id');
+          return (Topeng.fromJson(res['topeng'] as Map<String, dynamic>), mapList(res['reviews'], Review.fromJson));
+        },
+        builder: (context, data, _) => _TopengBody(topeng: data.$1, reviews: data.$2),
       ),
     );
   }
@@ -109,7 +114,8 @@ class TopengDetailScreen extends StatelessWidget {
 
 class _TopengBody extends StatefulWidget {
   final Topeng topeng;
-  const _TopengBody({required this.topeng});
+  final List<Review> reviews;
+  const _TopengBody({required this.topeng, required this.reviews});
 
   @override
   State<_TopengBody> createState() => _TopengBodyState();
@@ -133,7 +139,7 @@ class _TopengBodyState extends State<_TopengBody> {
     final full = _fullPhone;
     if (full.isEmpty) return 'Nomor WhatsApp wajib diisi';
     if (_dial == '62') return Validators.phone(full, required: true);
-    final n = full.length - 1 - _dial.length;
+    final n = full.length - 1 - _dial.length; // jumlah digit nomor
     if (n < 6 || n > 14) return 'Nomor tidak valid';
     return null;
   }
@@ -238,7 +244,20 @@ class _TopengBodyState extends State<_TopengBody> {
         const SizedBox(width: 18),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t.name, style: headingStyle(size: 26, color: brown)),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(child: Text(t.name, style: headingStyle(size: 26, color: brown))),
+              if (t.avgRating != null) ...[
+                const SizedBox(width: 6),
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Icon(Icons.star_rounded, size: 18, color: AppColors.gold400),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(t.avgRating!.toStringAsFixed(1), style: const TextStyle(fontSize: 12.5, color: brown)),
+                ),
+              ],
+            ]),
             const SizedBox(height: 12),
             Text(formatRupiah(t.price), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: brown)),
             const SizedBox(height: 10),
@@ -344,6 +363,9 @@ class _TopengBodyState extends State<_TopengBody> {
           ),
         ),
       ),
+      // Ulasan hanya dibaca di sini. Menulis ulasan dilakukan dari Pesanan Saya.
+      const SizedBox(height: 24),
+      ReviewList(widget.reviews),
     ]);
   }
 }
