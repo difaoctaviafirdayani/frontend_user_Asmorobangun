@@ -67,7 +67,6 @@ class FacilityTile extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: LayoutBuilder(builder: (context, c) {
-            // Foto di kiri dan tingginya mengikuti tinggi card (penuh), teks di kanan.
             final narrow = c.maxWidth < 600;
             final imageW = c.maxWidth * (narrow ? 0.54 : 0.52);
             const gap = 12.0;
@@ -245,7 +244,6 @@ class _FacilityBody extends StatelessWidget {
           ],
         ),
         BookingForm(facility: f),
-        // Ulasan hanya dibaca di sini. Menulis ulasan dilakukan dari Pesanan Saya.
         const SizedBox(height: 20),
         ReviewList(data.reviews),
       ],
@@ -566,15 +564,15 @@ class _BookingFormState extends State<BookingForm> {
 
   Widget _resultView(Booking b) {
     if (b.status == 'menunggu_pembayaran') {
-      return Column(children: [
-        AppCard(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            StatusChip(b.status),
-            const SizedBox(height: 8),
-            const Text('Pilih metode pembayaran. Untuk QRIS dan transfer, unggah bukti pembayaranmu setelah membayar.'),
-          ]),
-        ),
-        const SizedBox(height: 10),
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        paymentHeading('Detail Transaksi', top: 22),
+        TransactionBox(status: b.status, rows: [
+          ('Nama Layanan', b.facilityName),
+          if ((b.date ?? '').isNotEmpty) ('Jadwal', formatDate(b.date)),
+          if (b.bookingType == 'wisata' && b.guestCount != null) ('Jumlah Peserta', '${b.guestCount} orang'),
+          if (b.amount != null) ('Total Pembayaran', formatRupiah(b.amount)),
+        ]),
+        paymentHeading('Pembayaran', top: 24),
         PaymentSection(
           kind: 'booking',
           id: b.id,

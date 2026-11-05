@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../core/api.dart';
 import '../core/format.dart';
 import '../core/picker.dart';
@@ -14,6 +15,8 @@ class PaymentSection extends StatefulWidget {
   final String? existingProof;
   final String? existingMethod;
   final VoidCallback onDone;
+  final bool verified;
+  final bool canChange;
 
   const PaymentSection({
     super.key,
@@ -24,6 +27,8 @@ class PaymentSection extends StatefulWidget {
     this.methods = const {},
     this.existingProof,
     this.existingMethod,
+    this.verified = false,
+    this.canChange = true,
   });
 
   @override
@@ -86,7 +91,7 @@ class _PaymentSectionState extends State<PaymentSection> {
   }
 
   Future<void> _pick() async {
-    final f = await pickImageFile();
+    final f = await pickValidImage(context);
     if (f != null) setState(() => _picked = f);
   }
 
@@ -110,103 +115,11 @@ class _PaymentSectionState extends State<PaymentSection> {
   @override
   Widget build(BuildContext context) {
     if (widget.existingProof != null && widget.existingProof!.isNotEmpty) {
-      return _topeng ? _topengDone() : _proofDone();
+      return _topengDone();
     }
     if (widget.kind != 'topeng' && widget.existingMethod == 'cash' && !_changing) return _cashDone();
-    return _topeng ? _topengPicker() : _picker();
+    return _topengPicker();
   }
-
-  bool get _topeng => widget.kind == 'topeng';
-
-  Widget _card({required Widget child}) => AppCard(
-        color: _topeng ? const Color(0xFFFDFBE8) : null,
-        borderColor: _topeng ? AppColors.wood700 : null,
-        child: child,
-      );
-
-  Widget _doneBox({required IconData icon, required String title, required String subtitle, List<Widget> actions = const []}) {
-    return _card(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(color: AppColors.ok, shape: BoxShape.circle),
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 2),
-              Text(subtitle, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13)),
-            ]),
-          ),
-        ]),
-        if (actions.isNotEmpty) ...[const SizedBox(height: 10), Wrap(spacing: 8, children: actions)],
-      ]),
-    );
-  }
-
-  Widget _proofDone() => _doneBox(
-        icon: Icons.check_rounded,
-        title: 'Bukti pembayaran terkirim',
-        subtitle: 'Metode: ${methodLabel(widget.existingMethod)} · Menunggu verifikasi admin.',
-        actions: [
-          OutlinedButton(
-            onPressed: () => openUrl(context, assetUrl(widget.existingProof)),
-            child: const Text('Lihat bukti'),
-          ),
-        ],
-      );
-
-  Widget _cashDone() => _doneBox(
-        icon: Icons.payments_outlined,
-        title: 'Pembayaran tunai dicatat',
-        subtitle: 'Silakan bayar langsung di lokasi. Tidak perlu unggah bukti pembayaran.',
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() => _changing = true);
-              final first = _available.isEmpty ? null : _available.first;
-              if (first != null) _select(first);
-            },
-            child: const Text('Ganti metode pembayaran'),
-          ),
-        ],
-      );
-
-  Widget _picker() {
-    final methods = _available;
-    if (methods.isEmpty) {
-      return const AppCard(child: EmptyState('Belum ada metode pembayaran yang aktif. Silakan hubungi admin sanggar.'));
-    }
-    final current = _method ?? methods.first;
-    return _card(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Pilih metode pembayaran', style: TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 10),
-        Wrap(spacing: 8, children: [
-          for (final m in methods)
-            ChoiceChip(
-              label: Text(methodLabel(m)),
-              selected: current == m,
-              selectedColor: _topeng ? AppColors.wood700 : AppColors.gold300,
-              backgroundColor: _topeng ? Colors.white : null,
-              checkmarkColor: _topeng ? Colors.white : null,
-              side: _topeng ? const BorderSide(color: AppColors.wood700, width: 1.3) : null,
-              labelStyle: _topeng
-                  ? TextStyle(color: current == m ? Colors.white : AppColors.wood700)
-                  : null,
-              onSelected: (_) => _select(m),
-            ),
-        ]),
-        const SizedBox(height: 14),
-        if (current == 'cash') _cashArea() else _onlineArea(current),
-      ]),
-    );
-  }
-
 
   static const _fill = Color(0xFFFDFBE8);
   static const _brownBtn = Color(0xFF5C3724);
@@ -215,6 +128,39 @@ class _PaymentSectionState extends State<PaymentSection> {
         color: color,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppColors.wood700, width: 1),
+      );
+
+  Widget _cashDone() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: _topengBox(),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.check_circle_outline_rounded, color: AppColors.wood900, size: 22),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Pembayaran tunai dicatat',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.wood900)),
+                SizedBox(height: 2),
+                Text('Silakan datang ke sanggar dan bayar langsung di lokasi. Tidak perlu unggah bukti pembayaran.',
+                    style: TextStyle(fontSize: 12.5, color: AppColors.wood800)),
+              ]),
+            ),
+          ]),
+          if (widget.canChange) ...[
+            const SizedBox(height: 8),
+            TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: AppColors.wood800),
+              onPressed: () {
+                setState(() => _changing = true);
+                final first = _available.isEmpty ? null : _available.first;
+                if (first != null) _select(first);
+              },
+              child: const Text('Ganti metode pembayaran', style: TextStyle(fontSize: 12.5)),
+            ),
+          ],
+        ]),
       );
 
   Widget _topengDone() => Container(
@@ -230,7 +176,7 @@ class _PaymentSectionState extends State<PaymentSection> {
                 const Text('Bukti pembayaran terkirim',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.wood900)),
                 const SizedBox(height: 2),
-                Text('Metode: ${methodLabel(widget.existingMethod)} - Menunggu verifikasi admin',
+                Text('Metode: ${methodLabel(widget.existingMethod)} - ${widget.verified ? 'Pembayaran terverifikasi' : 'Menunggu verifikasi admin'}',
                     style: const TextStyle(fontSize: 12.5, color: AppColors.wood800)),
               ]),
             ),
@@ -265,7 +211,7 @@ class _PaymentSectionState extends State<PaymentSection> {
         const Text('Pilih Metode Pembayaran',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.wood900)),
         const SizedBox(height: 10),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Wrap(alignment: WrapAlignment.center, children: [
           for (final m in methods)
             InkWell(
               onTap: _busy ? null : () => _select(m),
@@ -286,7 +232,7 @@ class _PaymentSectionState extends State<PaymentSection> {
             ),
         ]),
         const SizedBox(height: 12),
-        _onlineArea(current),
+        if (current == 'cash') _cashArea() else _onlineArea(current),
       ]),
     );
   }
@@ -394,13 +340,29 @@ class _PaymentSectionState extends State<PaymentSection> {
   Widget _cashArea() {
     final cfg = widget.methods['cash'];
     final note = cfg is Map ? (cfg['note'] ?? '').toString() : '';
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (note.isNotEmpty) Text('Catatan: $note', style: const TextStyle(fontWeight: FontWeight.w600)),
-      const Text('Bayar tunai langsung di lokasi sanggar. Tidak perlu unggah bukti pembayaran.'),
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: const Color(0xFFFFEDCB), borderRadius: BorderRadius.circular(10)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (note.isNotEmpty) ...[
+            Text('Catatan: $note',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: AppColors.wood900)),
+            const SizedBox(height: 4),
+          ],
+          const Text('Bayar tunai langsung di sanggar saat kamu datang. Tidak perlu unggah bukti pembayaran.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.wood900, height: 1.4)),
+        ]),
+      ),
       const SizedBox(height: 12),
-      SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(onPressed: _busy ? null : _chooseCash, child: Text(_busy ? 'Memproses...' : 'Pilih Bayar Tunai')),
+      ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _brownBtn,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        onPressed: _busy ? null : _chooseCash,
+        child: Text(_busy ? 'Memproses...' : 'Pilih Bayar Tunai', style: const TextStyle(fontSize: 14)),
       ),
     ]);
   }
@@ -418,88 +380,50 @@ class _PaymentSectionState extends State<PaymentSection> {
         if (snap.hasError) return Text(snap.error.toString(), style: const TextStyle(color: AppColors.danger));
         final data = snap.data ?? {};
         final amount = data['amount'] is num ? (data['amount'] as num).toInt() : widget.amount;
-        if (_topeng) {
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (method == 'qris') _topengQris(data, amount) else _topengTransfer(data, amount),
-            _topengUpload(method),
-          ]);
-        }
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (method == 'qris') _qris(data, amount) else _transfer(data, amount),
-          const SizedBox(height: 14),
-          const Text('Unggah bukti pembayaran', style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _busy ? null : _pick,
-            icon: const Icon(Icons.image_outlined),
-            label: Text(_picked == null ? 'Pilih foto bukti' : _picked!.name, overflow: TextOverflow.ellipsis),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _busy ? null : () => _uploadProof(method),
-              child: Text(_busy ? 'Mengunggah...' : 'Unggah Bukti'),
-            ),
-          ),
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (method == 'qris') _topengQris(data, amount) else _topengTransfer(data, amount),
+          _topengUpload(method),
         ]);
       },
     );
   }
 
-  Widget _qris(Map<String, dynamic> data, int? amount) {
-    return Column(children: [
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.line)),
-        child: Column(children: [
-          NetImage(src: data['qris']?.toString(), height: 240, fit: BoxFit.contain),
-          if (amount != null) ...[
-            const SizedBox(height: 8),
-            Text(formatRupiah(amount), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          ],
-          const SizedBox(height: 4),
-          Text(
-            (data['note'] ?? 'Scan dengan aplikasi e-wallet atau mobile banking, lalu unggah bukti pembayaran.').toString(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.inkSoft, fontSize: 12),
-          ),
-        ]),
-      ),
-    ]);
-  }
 
-  Widget _transfer(Map<String, dynamic> data, int? amount) {
-    final note = (data['note'] ?? '').toString();
-    final bank = data['bank'] is Map ? data['bank'] as Map : const {};
-    final account = (bank['accountNumber'] ?? '').toString();
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: AppColors.cream200, borderRadius: BorderRadius.circular(14)),
-      child: Column(children: [
-        if (note.isNotEmpty)
-          KeyValueRow('Info transfer', note)
-        else ...[
-          KeyValueRow('Bank', (bank['bankName'] ?? '-').toString()),
-          KeyValueRow('No. Rekening', account.isEmpty ? '-' : account),
-          KeyValueRow('Atas Nama', (bank['accountName'] ?? '-').toString()),
-        ],
-        if (amount != null) KeyValueRow('Nominal', formatRupiah(amount)),
-        if (note.isEmpty && account.isNotEmpty)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: account.replaceAll(RegExp(r'[^0-9]'), '')));
-                showSnack(context, 'Nomor rekening disalin.');
-              },
-              icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('Salin no. rekening'),
-            ),
-          ),
-      ]),
+}
+
+Widget paymentHeading(String text, {double top = 0}) => Padding(
+      padding: EdgeInsets.only(top: top, bottom: 10),
+      child: Text(text, style: headingStyle(size: 20, color: AppColors.wood700)),
     );
-  }
+
+class TransactionBox extends StatelessWidget {
+  final String status;
+  final List<(String, String)> rows;
+  const TransactionBox({super.key, required this.status, required this.rows});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.wood700, width: 1),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(padding: const EdgeInsets.only(bottom: 8), child: StatusChip(status)),
+          for (final r in rows)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(flex: 4, child: Text(r.$1, style: const TextStyle(color: AppColors.wood900, fontSize: 13))),
+                Expanded(
+                  flex: 6,
+                  child: Text(r.$2,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.wood900)),
+                ),
+              ]),
+            ),
+        ]),
+      );
 }

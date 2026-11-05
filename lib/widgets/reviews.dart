@@ -10,7 +10,6 @@ import 'common.dart';
 const _fill = Color(0xFFFDFBE8);
 const _brownBtn = Color(0xFF5C3724);
 
-/// Deretan bintang (hanya tampilan).
 class StarRow extends StatelessWidget {
   final int value;
   final double size;
@@ -26,7 +25,6 @@ class StarRow extends StatelessWidget {
       );
 }
 
-/// Satu ulasan di halaman layanan dan katalog topeng (hanya dibaca).
 class ReviewTile extends StatelessWidget {
   final Review review;
   final bool showDivider;
@@ -63,7 +61,6 @@ class ReviewTile extends StatelessWidget {
   }
 }
 
-/// Daftar ulasan + teks kosong. Dipakai di layanan dan topeng.
 class ReviewList extends StatelessWidget {
   final List<Review> reviews;
   const ReviewList(this.reviews, {super.key});
@@ -79,10 +76,6 @@ class ReviewList extends StatelessWidget {
   }
 }
 
-/// Dialog "Berikan Pengalamanmu". Dibuka dari Pesanan Saya setelah pesanan/booking selesai.
-/// [basePath] contoh: /bookings/bk-123/review atau /topeng/orders/ord-123/review.
-/// Bila [existing] diisi, dialog menjadi mode edit (ada tombol Hapus dan Simpan).
-/// Mengembalikan true kalau ada perubahan (kirim, simpan, atau hapus).
 Future<bool> showReviewDialog(BuildContext context, {required String basePath, Review? existing}) async {
   final changed = await showDialog<bool>(
     context: context,
@@ -119,7 +112,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
   }
 
   Future<void> _pick() async {
-    final f = await pickImageFile();
+    final f = await pickValidImage(context, onInvalid: (m) => setState(() => _error = m));
     if (f == null) return;
     if (f.bytes.length > 5 * 1024 * 1024) {
       setState(() => _error = 'Ukuran foto maksimal 5MB.');
@@ -154,7 +147,6 @@ class _ReviewDialogState extends State<_ReviewDialog> {
       return;
     }
 
-    // Ulasan sudah tersimpan. Foto bersifat opsional, jadi kegagalannya tidak membatalkan ulasan.
     String message = _editing ? 'Ulasan diperbarui.' : 'Ulasan terkirim, makasih!';
     try {
       if (_picked != null) {

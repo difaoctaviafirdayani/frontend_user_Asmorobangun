@@ -177,7 +177,7 @@ class ForumThread {
 class Booking {
   final String id, facilityId, facilityName, bookingType, notes, status, createdAt;
   final String? date, eventType, location, paymentMethod, proofFile;
-  final int? amount;
+  final int? amount, guestCount;
   final Review? review;
   Booking({
     required this.id,
@@ -193,6 +193,7 @@ class Booking {
     this.paymentMethod,
     this.proofFile,
     this.amount,
+    this.guestCount,
     this.review,
   });
   factory Booking.fromJson(Map<String, dynamic> j) => Booking(
@@ -209,6 +210,7 @@ class Booking {
         paymentMethod: j['paymentMethod'] == null ? null : _s(j['paymentMethod']),
         proofFile: j['proofFile'] == null ? null : _s(j['proofFile']),
         amount: _in(j['amount']),
+        guestCount: _in(j['guestCount']),
         review: _reviewOrNull(j['review']),
       );
 }
@@ -263,10 +265,7 @@ class TopengOrder {
         review: _reviewOrNull(j['review']),
       );
 
-  /// Dibatalkan otomatis oleh server bila belum dibayar dalam 24 jam.
   bool get isCancelled => status == 'dibatalkan';
-
-  /// Belum ada bukti bayar, belum memilih tunai, dan masih menunggu.
   bool get awaitingPayment =>
       (proofFile ?? '').isEmpty && paymentMethod != 'cash' && status == 'menunggu_konfirmasi_admin';
 }

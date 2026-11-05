@@ -363,7 +363,6 @@ class _TopengBodyState extends State<_TopengBody> {
           ),
         ),
       ),
-      // Ulasan hanya dibaca di sini. Menulis ulasan dilakukan dari Pesanan Saya.
       const SizedBox(height: 24),
       ReviewList(widget.reviews),
     ]);
@@ -444,6 +443,7 @@ class OrderDetailScreen extends StatelessWidget {
               amount: o.total,
               existingProof: o.proofFile,
               existingMethod: o.paymentMethod,
+              verified: const ['dikonfirmasi', 'diproses', 'dikirim', 'selesai'].contains(o.status),
               onDone: reload,
             ),
           ],

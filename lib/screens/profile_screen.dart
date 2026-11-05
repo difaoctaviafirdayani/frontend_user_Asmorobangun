@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/picker.dart';
@@ -44,7 +47,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
   static const _maxAvatarBytes = 3 * 1024 * 1024;
 
   Future<void> _changeAvatar() async {
-    final f = await pickImageFile();
+    final f = await pickValidImage(context, allowGif: false);
     if (f == null) return;
     if (f.bytes.length > _maxAvatarBytes) {
       if (mounted) showSnack(context, 'Ukuran foto maksimal 3MB.');
@@ -150,10 +153,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
       ),
       const Divider(height: 1, thickness: 1, color: AppColors.wood700),
       _menuRow(
-        icon: const Stack(alignment: Alignment.center, children: [
-          Icon(Icons.circle_outlined, color: AppColors.wood900, size: 26),
-          Icon(Icons.phone, color: AppColors.wood900, size: 13),
-        ]),
+        icon: const _WhatsappIcon(color: AppColors.wood900, size: 26),
         label: const Text('Hubungi Admin (WhatsApp)', style: TextStyle(fontSize: 14, color: AppColors.wood900, decoration: TextDecoration.underline, decorationColor: AppColors.wood900)),
         onTap: () => openUrl(context, waUrl()),
       ),
@@ -165,4 +165,51 @@ class _ProfileBodyState extends State<_ProfileBody> {
       ),
     ]);
   }
+}
+
+class _WhatsappIcon extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _WhatsappIcon({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size,
+        height: size,
+        child: Stack(alignment: Alignment.center, children: [
+          CustomPaint(size: Size.square(size), painter: _BubblePainter(color)),
+          Icon(Icons.phone, size: size * 0.5, color: color),
+        ]),
+      );
+}
+
+class _BubblePainter extends CustomPainter {
+  final Color color;
+  _BubblePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    final r = size.width / 2 - 1.5;
+    final rect = Rect.fromCircle(center: c, radius: r);
+    final start = 160 * math.pi / 180;
+    final sweep = 310 * math.pi / 180;
+    final a = Offset(c.dx + r * math.cos(start), c.dy + r * math.sin(start));
+    final path = Path()
+      ..moveTo(a.dx, a.dy)
+      ..arcTo(rect, start, sweep, false)
+      ..lineTo(c.dx - r * 1.05, c.dy + r * 1.05)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_BubblePainter old) => old.color != color;
 }
