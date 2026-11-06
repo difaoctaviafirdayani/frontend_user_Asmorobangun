@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../core/validators.dart';
 import '../models/models.dart';
+import '../repositories/facility_repository.dart';
+import '../viewmodels/booking_viewmodel.dart';
+import '../viewmodels/facility_detail_viewmodel.dart';
+import '../viewmodels/facility_list_viewmodel.dart';
 import '../widgets/auth_ui.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 import '../widgets/payment_section.dart';
 import '../widgets/reviews.dart';
 import 'auth_screens.dart';
@@ -23,15 +27,29 @@ class FacilitiesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => FacilityListViewModel(c.read<FacilityRepository>())..load(),
+      child: const _FacilitiesView(),
+    );
+  }
+}
+
+class _FacilitiesView extends StatelessWidget {
+  const _FacilitiesView();
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<FacilityListViewModel>();
     return AppScaffold(
       title: 'Layanan Sanggar',
       backgroundColor: Colors.white,
-      body: AsyncView<List<Facility>>(
-        loader: () async => mapList(
-          (await api.get('/facilities'))['facilities'],
-          Facility.fromJson,
-        ),
-        builder: (context, items, _) => ListView.separated(
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (context) {
+          final items = vm.data!;
+          return ListView.separated(
           padding: EdgeInsets.symmetric(
             horizontal: MediaQuery.sizeOf(context).width < 600 ? 16 : 28,
             vertical: 20,
@@ -39,7 +57,8 @@ class FacilitiesScreen extends StatelessWidget {
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(height: 16),
           itemBuilder: (context, i) => FacilityTile(facility: items[i]),
-        ),
+          );
+        },
       ),
     );
   }
@@ -136,40 +155,41 @@ class FacilityTile extends StatelessWidget {
   }
 }
 
-class _FacilityData {
-  final Facility facility;
-  final List<Review> reviews;
-  _FacilityData(this.facility, this.reviews);
-}
-
 class FacilityDetailScreen extends StatelessWidget {
   final String id;
   const FacilityDetailScreen({super.key, required this.id});
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => FacilityDetailViewModel(c.read<FacilityRepository>(), id)..load(),
+      child: const _FacilityDetailView(),
+    );
+  }
+}
+
+class _FacilityDetailView extends StatelessWidget {
+  const _FacilityDetailView();
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<FacilityDetailViewModel>();
     return AppScaffold(
       title: 'Layanan Sanggar',
       backgroundColor: Colors.white,
-      body: AsyncView<_FacilityData>(
-        loader: () async {
-          final res = await api.get('/facilities/$id');
-          return _FacilityData(
-            Facility.fromJson(res['facility'] as Map<String, dynamic>),
-            mapList(res['reviews'], Review.fromJson),
-          );
-        },
-        builder: (context, data, reload) =>
-            _FacilityBody(data: data, reload: reload),
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (_) => _FacilityBody(data: vm.data!),
       ),
     );
   }
 }
 
 class _FacilityBody extends StatelessWidget {
-  final _FacilityData data;
-  final VoidCallback reload;
-  const _FacilityBody({required this.data, required this.reload});
+  final FacilityDetail data;
+  const _FacilityBody({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -326,15 +346,28 @@ class _LoginNotice extends StatelessWidget {
       );
 }
 
-class BookingForm extends StatefulWidget {
+class BookingForm extends StatelessWidget {
   final Facility facility;
   const BookingForm({super.key, required this.facility});
 
   @override
-  State<BookingForm> createState() => _BookingFormState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => BookingViewModel(c.read<FacilityRepository>(), facility),
+      child: _BookingFormView(facility: facility),
+    );
+  }
 }
 
-class _BookingFormState extends State<BookingForm> {
+class _BookingFormView extends StatefulWidget {
+  final Facility facility;
+  const _BookingFormView({required this.facility});
+
+  @override
+  State<_BookingFormView> createState() => _BookingFormViewState();
+}
+
+class _BookingFormViewState extends State<_BookingFormView> {
   final _formKey = GlobalKey<FormState>();
   final _scheduleText = TextEditingController();
   final _notes = TextEditingController();
@@ -344,12 +377,10 @@ class _BookingFormState extends State<BookingForm> {
   final _qty = TextEditingController(text: '1');
   final _dateCtrl = TextEditingController();
   DateTime? _date;
-  bool _busy = false;
-  Booking? _result;
 
   Facility get f => widget.facility;
-  bool get _needsPaymentNow => f.bookingType == 'wisata' || f.bookingType == 'rental';
-  bool get _usesDatePicker => f.bookingType != 'reguler';
+  bool get _needsPaymentNow => f.needsPaymentNow;
+  bool get _usesDatePicker => f.usesDatePicker;
 
   @override
   void dispose() {
@@ -403,55 +434,43 @@ class _BookingFormState extends State<BookingForm> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (!await ensureLogin(context)) return;
-
-    final body = <String, dynamic>{
-      'facilityId': f.id,
-      'date': _usesDatePicker ? dateParam(_date!) : Validators.clean(_scheduleText.text),
-      'notes': Validators.clean(_notes.text),
-      'paymentMethod': _needsPaymentNow ? 'qris' : null,
-    };
-    if (f.bookingType == 'event') {
-      body['eventType'] = Validators.clean(_eventType.text);
-      body['location'] = Validators.clean(_location.text);
-      final g = int.tryParse(_guests.text.trim());
-      if (g != null) body['guestCount'] = g;
-    }
-    if (f.bookingType == 'wisata') body['guestCount'] = int.parse(_qty.text.trim());
-
-    setState(() => _busy = true);
-    try {
-      final res = await api.post('/bookings', body: body);
-      if (!mounted) return;
-      showSnack(context, 'Permintaan terkirim!');
-      setState(() => _result = Booking.fromJson(res['booking'] as Map<String, dynamic>));
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!mounted) return;
+    final vm = context.read<BookingViewModel>();
+    final ok = await vm.submit(
+      date: _date,
+      scheduleText: _scheduleText.text,
+      notes: _notes.text,
+      eventType: _eventType.text,
+      location: _location.text,
+      guests: _guests.text,
+      qty: _qty.text,
+    );
+    if (!mounted) return;
+    showSnack(context, ok ? 'Permintaan terkirim!' : (vm.error ?? 'Terjadi kesalahan. Coba lagi.'));
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<BookingViewModel>();
     final loggedIn = context.watch<AuthState>().isLoggedIn;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _Heading(_heading),
-        if (_result != null)
-          _resultView(_result!)
+        if (vm.result != null)
+          _resultView(vm.result!, vm)
         else ...[
           if (!loggedIn)
             _LoginNotice(onTap: () {
               ensureLogin(context);
             }),
-          _form(loggedIn),
+          _form(loggedIn, vm),
         ],
       ],
     );
   }
 
-  Widget _form(bool loggedIn) {
+  Widget _form(bool loggedIn, BookingViewModel vm) {
     final type = f.bookingType;
     return _Gate(
       enabled: loggedIn,
@@ -548,7 +567,7 @@ class _BookingFormState extends State<BookingForm> {
                     style: const TextStyle(color: AppColors.inkSoft, fontSize: 12.5),
                   ),
                 ),
-              AuthButton(label: _submitLabel, busy: _busy, onPressed: _submit),
+              AuthButton(label: _submitLabel, busy: vm.busy, onPressed: _submit),
             ],
           ),
         ),
@@ -562,7 +581,7 @@ class _BookingFormState extends State<BookingForm> {
     return 'Metode pembayaran bisa dikonfirmasi belakangan bila diperlukan.';
   }
 
-  Widget _resultView(Booking b) {
+  Widget _resultView(Booking b, BookingViewModel vm) {
     if (b.status == 'menunggu_pembayaran') {
       return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         paymentHeading('Detail Transaksi', top: 22),
@@ -578,13 +597,7 @@ class _BookingFormState extends State<BookingForm> {
           id: b.id,
           amount: b.amount,
           methods: f.paymentMethods,
-          onDone: () async {
-            try {
-              final res = await api.get('/bookings/mine');
-              final mine = mapList(res['bookings'], Booking.fromJson).where((x) => x.id == b.id);
-              if (mine.isNotEmpty && mounted) setState(() => _result = mine.first);
-            } on ApiException {}
-          },
+          onDone: vm.refreshResult,
         ),
       ]);
     }

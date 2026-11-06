@@ -61,7 +61,6 @@ ThemeData buildTheme() {
   );
 }
 
-/// Dekorasi input yang seragam (tanpa bergantung pada tema global).
 InputDecoration inputDec(String label, {String? hint}) {
   OutlineInputBorder border(Color c, [double w = 1.5]) => OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

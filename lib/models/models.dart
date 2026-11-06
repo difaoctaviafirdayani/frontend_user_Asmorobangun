@@ -44,6 +44,10 @@ class Facility {
     this.paymentMethods = const {},
   });
 
+  bool get needsPaymentNow => bookingType == 'wisata' || bookingType == 'rental';
+
+  bool get usesDatePicker => bookingType != 'reguler';
+
   factory Facility.fromJson(Map<String, dynamic> j) => Facility(
         id: _s(j['id']),
         name: _s(j['name']),

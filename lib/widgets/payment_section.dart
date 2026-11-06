@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/format.dart';
 import '../core/picker.dart';
 import '../core/theme.dart';
+import '../repositories/payment_repository.dart';
+import '../viewmodels/base_viewmodel.dart';
+import '../viewmodels/payment_viewmodel.dart';
 import 'common.dart';
 
-class PaymentSection extends StatefulWidget {
+class PaymentSection extends StatelessWidget {
   final String kind;
   final String id;
   final int? amount;
@@ -32,88 +35,92 @@ class PaymentSection extends StatefulWidget {
   });
 
   @override
-  State<PaymentSection> createState() => _PaymentSectionState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => PaymentViewModel(c.read<PaymentRepository>(), kind: kind, id: id, methods: methods),
+      child: _PaymentView(
+        kind: kind,
+        amount: amount,
+        methods: methods,
+        existingProof: existingProof,
+        existingMethod: existingMethod,
+        onDone: onDone,
+        verified: verified,
+        canChange: canChange,
+      ),
+    );
+  }
 }
 
-class _PaymentSectionState extends State<PaymentSection> {
-  String? _method;
-  bool _changing = false;
-  bool _busy = false;
-  Future<Map<String, dynamic>>? _info;
-  ({List<int> bytes, String name})? _picked;
+class _PaymentView extends StatefulWidget {
+  final String kind;
+  final int? amount;
+  final Map<String, dynamic> methods;
+  final String? existingProof;
+  final String? existingMethod;
+  final VoidCallback onDone;
+  final bool verified;
+  final bool canChange;
 
-  String get _base =>
-      widget.kind == 'topeng' ? '/topeng/orders/${widget.id}' : '/bookings/${widget.id}';
-
-  List<String> get _available {
-    bool on(String m) {
-      final cfg = widget.methods[m];
-      return cfg is! Map || cfg['enabled'] != false;
-    }
-
-    final all = widget.kind == 'topeng' ? ['qris', 'transfer'] : ['qris', 'transfer', 'cash'];
-    return all.where(on).toList();
-  }
+  const _PaymentView({
+    required this.kind,
+    required this.onDone,
+    required this.amount,
+    required this.methods,
+    required this.existingProof,
+    required this.existingMethod,
+    required this.verified,
+    required this.canChange,
+  });
 
   @override
-  void initState() {
-    super.initState();
-    final first = _available.isEmpty ? null : _available.first;
-    if (first != null) _select(first, initial: true);
-  }
+  State<_PaymentView> createState() => _PaymentViewState();
+}
 
-  void _select(String m, {bool initial = false}) {
-    void apply() {
-      _method = m;
-      _picked = null;
-      _info = (m == 'cash') ? null : api.get('$_base/${m == 'qris' ? 'qris' : 'transfer'}');
-    }
+class _PaymentViewState extends State<_PaymentView> {
+  bool _changing = false;
 
-    if (initial) {
-      apply();
-    } else {
-      setState(apply);
-    }
-  }
+  PaymentViewModel get _vm => context.read<PaymentViewModel>();
+
+  List<String> get _available => _vm.available;
+  String? get _method => _vm.method;
+  bool get _busy => _vm.busy;
+  PickedImage? get _picked => _vm.picked;
+
+  void _select(String m) => _vm.selectMethod(m);
 
   Future<void> _chooseCash() async {
-    setState(() => _busy = true);
-    try {
-      await api.post('$_base/cash');
-      if (!mounted) return;
+    final ok = await _vm.chooseCash();
+    if (!mounted) return;
+    if (ok) {
       showSnack(context, 'Pembayaran tunai dicatat. Bayar langsung di lokasi ya.');
       widget.onDone();
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    } else {
+      showSnack(context, _vm.error ?? 'Terjadi kesalahan. Coba lagi.');
     }
   }
 
   Future<void> _pick() async {
+    final vm = _vm;
     final f = await pickValidImage(context);
-    if (f != null) setState(() => _picked = f);
+    if (f != null) vm.setPicked(f);
   }
 
   Future<void> _uploadProof(String method) async {
-    final f = _picked;
-    if (f == null) return showSnack(context, 'Pilih foto bukti pembayaran dulu.');
-    setState(() => _busy = true);
-    try {
-      await api.upload('$_base/proof',
-          field: 'proof', bytes: f.bytes, filename: f.name, fields: {'paymentMethod': method});
-      if (!mounted) return;
+    final vm = _vm;
+    final ok = await vm.uploadProof(method);
+    if (!mounted) return;
+    if (ok) {
       showSnack(context, 'Bukti pembayaran diunggah!');
       widget.onDone();
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    } else {
+      showSnack(context, vm.error ?? 'Terjadi kesalahan. Coba lagi.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    context.watch<PaymentViewModel>();
     if (widget.existingProof != null && widget.existingProof!.isNotEmpty) {
       return _topengDone();
     }
@@ -368,27 +375,24 @@ class _PaymentSectionState extends State<PaymentSection> {
   }
 
   Widget _onlineArea(String method) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _info,
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator(color: AppColors.gold400)),
-          );
-        }
-        if (snap.hasError) return Text(snap.error.toString(), style: const TextStyle(color: AppColors.danger));
-        final data = snap.data ?? {};
+    final vm = _vm;
+    switch (vm.infoStatus) {
+      case LoadStatus.loading:
+        return const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator(color: AppColors.gold400)),
+        );
+      case LoadStatus.error:
+        return Text(vm.infoError ?? '', style: const TextStyle(color: AppColors.danger));
+      case LoadStatus.success:
+        final data = vm.info;
         final amount = data['amount'] is num ? (data['amount'] as num).toInt() : widget.amount;
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (method == 'qris') _topengQris(data, amount) else _topengTransfer(data, amount),
           _topengUpload(method),
         ]);
-      },
-    );
+    }
   }
-
-
 }
 
 Widget paymentHeading(String text, {double top = 0}) => Padding(

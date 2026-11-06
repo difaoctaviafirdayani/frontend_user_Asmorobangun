@@ -186,43 +186,6 @@ class NetImage extends StatelessWidget {
   }
 }
 
-class AsyncView<T> extends StatefulWidget {
-  final Future<T> Function() loader;
-  final Widget Function(BuildContext context, T data, VoidCallback reload) builder;
-  const AsyncView({super.key, required this.loader, required this.builder});
-
-  @override
-  State<AsyncView<T>> createState() => _AsyncViewState<T>();
-}
-
-class _AsyncViewState<T> extends State<AsyncView<T>> {
-  late Future<T> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = widget.loader();
-  }
-
-  void _reload() => setState(() => _future = widget.loader());
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<T>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Center(
-            child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator(color: AppColors.gold400)),
-          );
-        }
-        if (snap.hasError) return ErrorView(message: snap.error.toString(), onRetry: _reload);
-        return widget.builder(context, snap.data as T, _reload);
-      },
-    );
-  }
-}
-
 class ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
@@ -261,21 +224,6 @@ class EmptyState extends StatelessWidget {
       );
 }
 
-class SectionHeader extends StatelessWidget {
-  final String title;
-  final VoidCallback? onSeeAll;
-  const SectionHeader(this.title, {super.key, this.onSeeAll});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-        child: Row(children: [
-          Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.wood900))),
-          if (onSeeAll != null) TextButton(onPressed: onSeeAll, child: const Text('Lihat semua')),
-        ]),
-      );
-}
-
 class StatusChip extends StatelessWidget {
   final String status;
   const StatusChip(this.status, {super.key});
@@ -289,51 +237,6 @@ class StatusChip extends StatelessWidget {
       child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
     );
   }
-}
-
-class TagChip extends StatelessWidget {
-  final String text;
-  final bool gold;
-  const TagChip(this.text, {super.key, this.gold = false});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: gold ? AppColors.gold400 : AppColors.cream300,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: gold ? AppColors.wood950 : AppColors.wood800)),
-      );
-}
-
-class StarsRow extends StatelessWidget {
-  final double value;
-  final double size;
-  const StarsRow(this.value, {super.key, this.size = 16});
-
-  @override
-  Widget build(BuildContext context) {
-    final r = value.round();
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      for (var i = 1; i <= 5; i++)
-        Icon(Icons.star_rounded, size: size, color: i <= r ? AppColors.gold400 : AppColors.cream300),
-    ]);
-  }
-}
-
-class KeyValueRow extends StatelessWidget {
-  final String label, value;
-  const KeyValueRow(this.label, this.value, {super.key});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(flex: 4, child: Text(label, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13))),
-          Expanded(flex: 6, child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-        ]),
-      );
 }
 
 class NoticeBox extends StatelessWidget {

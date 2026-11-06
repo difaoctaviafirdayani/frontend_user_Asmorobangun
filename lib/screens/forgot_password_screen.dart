@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/auth_state.dart';
+import '../viewmodels/forgot_password_viewmodel.dart';
 import '../widgets/auth_ui.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends StatelessWidget {
   final String? initialEmail;
   const ForgotPasswordScreen({super.key, this.initialEmail});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => ForgotPasswordViewModel(c.read<AuthState>()),
+      child: _ForgotPasswordView(initialEmail: initialEmail),
+    );
+  }
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordView extends StatefulWidget {
+  final String? initialEmail;
+  const _ForgotPasswordView({this.initialEmail});
+
+  @override
+  State<_ForgotPasswordView> createState() => _ForgotPasswordViewState();
+}
+
+class _ForgotPasswordViewState extends State<_ForgotPasswordView> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _email =
       TextEditingController(text: widget.initialEmail ?? '');
@@ -23,8 +36,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   bool _hideNew = true;
   bool _hideConfirm = true;
-  bool _busy = false;
-  String? _error;
 
   static final _alnum = RegExp(r'^[A-Za-z0-9]+$');
   static final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
@@ -70,21 +81,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _submit() async {
-    if (_busy) return;
+    final vm = context.read<ForgotPasswordViewModel>();
+    if (vm.busy) return;
     if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final auth = context.read<AuthState>();
-    try {
-      final message = await auth.resetPassword(
-        email: _email.text.trim(),
-        phone: _phone.text.trim(),
-        newPassword: _newPass.text,
-        confirmPassword: _confirm.text,
-      );
-      if (!mounted) return;
+    final message = await vm.submit(
+      email: _email.text,
+      phone: _phone.text,
+      newPassword: _newPass.text,
+      confirmPassword: _confirm.text,
+    );
+    if (message == null || !mounted) return;
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -102,17 +108,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).maybePop();
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _error = 'Terjadi kesalahan. Coba lagi.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ForgotPasswordViewModel>();
     return AuthScaffold(
       child: Form(
         key: _formKey,
@@ -123,7 +123,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               'Lupa Password',
               'Masukkan email dan nomor HP yang Anda pakai saat mendaftar, lalu buat password baru.',
             ),
-            if (_error != null) AuthErrorBanner(_error!),
+            if (vm.error != null) AuthErrorBanner(vm.error!),
             AuthField(
               label: 'Email',
               hint: 'contoh@gmail.com',
@@ -169,7 +169,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             const SizedBox(height: 4),
             AuthButton(
               label: 'Ganti Password',
-              busy: _busy,
+              busy: vm.busy,
               onPressed: _submit,
             ),
             const SizedBox(height: 10),

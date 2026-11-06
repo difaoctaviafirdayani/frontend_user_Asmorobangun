@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/format.dart';
 import '../core/picker.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
+import '../repositories/review_repository.dart';
+import '../viewmodels/review_form_viewmodel.dart';
 import 'common.dart';
 
 const _fill = Color(0xFFFDFBE8);
@@ -85,25 +87,30 @@ Future<bool> showReviewDialog(BuildContext context, {required String basePath, R
   return changed == true;
 }
 
-class _ReviewDialog extends StatefulWidget {
+class _ReviewDialog extends StatelessWidget {
   final String basePath;
   final Review? existing;
   const _ReviewDialog({required this.basePath, this.existing});
 
   @override
-  State<_ReviewDialog> createState() => _ReviewDialogState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => ReviewFormViewModel(c.read<ReviewRepository>(), basePath, existing),
+      child: _ReviewDialogView(existing: existing),
+    );
+  }
 }
 
-class _ReviewDialogState extends State<_ReviewDialog> {
-  late int _rating = widget.existing?.rating ?? 0;
-  late final _comment = TextEditingController(text: widget.existing?.comment ?? '');
-  ({List<int> bytes, String name})? _picked;
-  bool _removeImage = false;
-  bool _busy = false;
-  String? _error;
+class _ReviewDialogView extends StatefulWidget {
+  final Review? existing;
+  const _ReviewDialogView({this.existing});
 
-  bool get _editing => widget.existing != null;
-  bool get _hasOldImage => (widget.existing?.image ?? '').isNotEmpty && !_removeImage;
+  @override
+  State<_ReviewDialogView> createState() => _ReviewDialogViewState();
+}
+
+class _ReviewDialogViewState extends State<_ReviewDialogView> {
+  late final _comment = TextEditingController(text: widget.existing?.comment ?? '');
 
   @override
   void dispose() {
@@ -112,73 +119,27 @@ class _ReviewDialogState extends State<_ReviewDialog> {
   }
 
   Future<void> _pick() async {
-    final f = await pickValidImage(context, onInvalid: (m) => setState(() => _error = m));
-    if (f == null) return;
-    if (f.bytes.length > 5 * 1024 * 1024) {
-      setState(() => _error = 'Ukuran foto maksimal 5MB.');
-      return;
-    }
-    setState(() {
-      _picked = f;
-      _error = null;
-    });
+    final vm = context.read<ReviewFormViewModel>();
+    final f = await pickValidImage(context, onInvalid: vm.setError);
+    if (f != null) vm.attachImage(f);
   }
 
   Future<void> _submit() async {
-    final text = _comment.text.trim();
-    if (_rating < 1) return setState(() => _error = 'Pilih jumlah bintang dulu ya.');
-    if (text.length < 3) return setState(() => _error = 'Komentar minimal 3 karakter.');
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final body = {'rating': _rating, 'comment': text};
-    try {
-      if (_editing) {
-        await api.put(widget.basePath, body: body);
-      } else {
-        await api.post(widget.basePath, body: body);
-      }
-    } on ApiException catch (e) {
-      if (mounted) setState(() {
-        _busy = false;
-        _error = e.message;
-      });
-      return;
-    }
-
-    String message = _editing ? 'Ulasan diperbarui.' : 'Ulasan terkirim, makasih!';
-    try {
-      if (_picked != null) {
-        await api.upload('${widget.basePath}/image', field: 'image', bytes: _picked!.bytes, filename: _picked!.name);
-      } else if (_removeImage && (widget.existing?.image ?? '').isNotEmpty) {
-        await api.delete('${widget.basePath}/image');
-      }
-    } on ApiException catch (e) {
-      message = 'Ulasan tersimpan, tapi foto gagal diunggah: ${e.message}';
-    }
-    if (!mounted) return;
+    final vm = context.read<ReviewFormViewModel>();
+    final message = await vm.submit(_comment.text);
+    if (message == null || !mounted) return;
     showSnack(context, message);
     Navigator.pop(context, true);
   }
 
   Future<void> _delete() async {
     if (!await confirmDialog(context, 'Hapus ulasan ini?', okLabel: 'Hapus')) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await api.delete(widget.basePath);
-      if (!mounted) return;
-      showSnack(context, 'Ulasan dihapus.');
-      Navigator.pop(context, true);
-    } on ApiException catch (e) {
-      if (mounted) setState(() {
-        _busy = false;
-        _error = e.message;
-      });
-    }
+    if (!mounted) return;
+    final vm = context.read<ReviewFormViewModel>();
+    final ok = await vm.delete();
+    if (!ok || !mounted) return;
+    showSnack(context, 'Ulasan dihapus.');
+    Navigator.pop(context, true);
   }
 
   Widget _label(String t) => Padding(
@@ -188,6 +149,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ReviewFormViewModel>();
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
       borderSide: const BorderSide(color: AppColors.wood700, width: 1),
@@ -214,7 +176,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: 'Tutup',
-                onPressed: _busy ? null : () => Navigator.pop(context, false),
+                onPressed: vm.busy ? null : () => Navigator.pop(context, false),
                 icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.wood900),
               ),
             ]),
@@ -222,18 +184,18 @@ class _ReviewDialogState extends State<_ReviewDialog> {
             Row(children: [
               for (var n = 1; n <= 5; n++)
                 GestureDetector(
-                  onTap: _busy ? null : () => setState(() => _rating = n),
+                  onTap: vm.busy ? null : () => vm.setRating(n),
                   child: Padding(
                     padding: const EdgeInsets.only(right: 4),
-                    child: Icon(n <= _rating ? Icons.star_rounded : Icons.star_border_rounded,
-                        size: 30, color: n <= _rating ? AppColors.gold400 : AppColors.wood800),
+                    child: Icon(n <= vm.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                        size: 30, color: n <= vm.rating ? AppColors.gold400 : AppColors.wood800),
                   ),
                 ),
             ]),
             _label('Komentar'),
             TextField(
               controller: _comment,
-              enabled: !_busy,
+              enabled: !vm.busy,
               minLines: 2,
               maxLines: 4,
               maxLength: 500,
@@ -252,14 +214,14 @@ class _ReviewDialogState extends State<_ReviewDialog> {
               ),
             ),
             _label('Gambar (Opsional)'),
-            if (_hasOldImage && _picked == null)
+            if (vm.hasOldImage && vm.picked == null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(children: [
                   NetImage(src: widget.existing!.image, width: 64, height: 64, radius: BorderRadius.circular(8)),
                   const SizedBox(width: 8),
                   TextButton(
-                    onPressed: _busy ? null : () => setState(() => _removeImage = true),
+                    onPressed: vm.busy ? null : vm.removeOldImage,
                     child: const Text('Hapus foto', style: TextStyle(fontSize: 12.5)),
                   ),
                 ]),
@@ -272,18 +234,18 @@ class _ReviewDialogState extends State<_ReviewDialog> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
               ),
-              onPressed: _busy ? null : _pick,
+              onPressed: vm.busy ? null : _pick,
               icon: const Icon(Icons.file_upload_outlined, size: 18),
-              label: Text(_picked?.name ?? 'Pilih file',
+              label: Text(vm.picked?.name ?? 'Pilih file',
                   overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400)),
             ),
-            if (_error != null)
+            if (vm.error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
-                child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 12.5)),
+                child: Text(vm.error!, style: const TextStyle(color: AppColors.danger, fontSize: 12.5)),
               ),
             const SizedBox(height: 16),
-            if (_editing)
+            if (vm.editing)
               Row(children: [
                 Expanded(
                   child: OutlinedButton(
@@ -294,29 +256,29 @@ class _ReviewDialogState extends State<_ReviewDialog> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       padding: const EdgeInsets.symmetric(vertical: 11),
                     ),
-                    onPressed: _busy ? null : _delete,
+                    onPressed: vm.busy ? null : _delete,
                     child: const Text('Hapus', style: TextStyle(fontSize: 14)),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: _primary('Simpan')),
+                Expanded(child: _primary(vm, 'Simpan')),
               ])
             else
-              _primary('Kirim Ulasan'),
+              _primary(vm, 'Kirim Ulasan'),
           ]),
         ),
       ),
     );
   }
 
-  Widget _primary(String label) => ElevatedButton(
+  Widget _primary(ReviewFormViewModel vm, String label) => ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: _brownBtn,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           padding: const EdgeInsets.symmetric(vertical: 11),
         ),
-        onPressed: _busy ? null : _submit,
-        child: Text(_busy ? 'Memproses...' : label, style: const TextStyle(fontSize: 14)),
+        onPressed: vm.busy ? null : _submit,
+        child: Text(vm.busy ? 'Memproses...' : label, style: const TextStyle(fontSize: 14)),
       );
 }

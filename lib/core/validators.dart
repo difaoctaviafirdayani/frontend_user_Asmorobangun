@@ -1,17 +1,9 @@
 import 'package:flutter/services.dart';
 
-/// LAPISAN 1: VALIDASI UI.
-/// Semua input pengguna dicek di sini sebelum dikirim ke server.
-/// Setiap fungsi mengembalikan pesan error (String) atau null bila valid,
-/// sehingga bisa dipakai langsung di `validator:` milik TextFormField.
-///
-/// Catatan: validasi di UI hanya untuk kenyamanan dan mengurangi request sia-sia.
-/// Server tetap menjadi penentu akhir (lapisan 2), karena UI bisa dilewati.
 class Validators {
   Validators._();
 
   static final _emailRe = RegExp(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$");
-  // Nomor Indonesia: 08xx..., 628xx..., atau +628xx..., total 9-13 digit setelah awalan.
   static final _phoneRe = RegExp(r'^(?:\+62|62|0)8[1-9][0-9]{7,11}$');
   static final _nameRe = RegExp(r"^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F .'\-]*$");
 
@@ -26,8 +18,6 @@ class Validators {
     return null;
   }
 
-  /// Untuk halaman masuk: cukup memastikan tidak kosong. Aturan kekuatan
-  /// password hanya dipakai saat mendaftar agar akun lama tetap bisa masuk.
   static String? passwordLogin(String? v) =>
       (v == null || v.isEmpty) ? 'Password wajib diisi' : null;
 
@@ -81,14 +71,10 @@ class Validators {
         return null;
       };
 
-  /// Pembersih ringan: buang karakter kontrol dan rapikan spasi berlebih.
-  /// (Pencegahan XSS yang sebenarnya ada di sisi render: Flutter menampilkan
-  /// teks apa adanya, bukan HTML, sehingga tag tidak dieksekusi.)
   static String clean(String v) =>
       v.replaceAll(RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]'), '').trim();
 }
 
-/// Pembatas karakter yang diizinkan saat mengetik.
 class InputFormats {
   InputFormats._();
   static final digitsOnly = <TextInputFormatter>[FilteringTextInputFormatter.digitsOnly];

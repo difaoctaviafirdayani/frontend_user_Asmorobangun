@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/routes.dart';
 import '../core/theme.dart';
 import '../core/validators.dart';
+import '../viewmodels/login_viewmodel.dart';
+import '../viewmodels/register_viewmodel.dart';
 import '../widgets/auth_ui.dart';
 import '../widgets/common.dart';
 
@@ -37,7 +38,7 @@ String? _phoneRequired(String? v) {
   return null;
 }
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends StatelessWidget {
   final bool embedded;
 
   final bool popOnSuccess;
@@ -47,16 +48,29 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.embedded = false, this.popOnSuccess = false, this.redirect});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => LoginViewModel(c.read<AuthState>()),
+      child: _LoginView(embedded: embedded, popOnSuccess: popOnSuccess, redirect: redirect),
+    );
+  }
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginView extends StatefulWidget {
+  final bool embedded;
+  final bool popOnSuccess;
+  final RouteSettings? redirect;
+  const _LoginView({required this.embedded, required this.popOnSuccess, required this.redirect});
+
+  @override
+  State<_LoginView> createState() => _LoginViewState();
+}
+
+class _LoginViewState extends State<_LoginView> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  bool _busy = false;
   bool _hide = true;
-  String? _error;
 
   @override
   void dispose() {
@@ -78,17 +92,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    setState(() => _error = null);
+    final vm = context.read<LoginViewModel>();
+    vm.clearError();
     if (!_form.currentState!.validate()) return;
-    setState(() => _busy = true);
-    try {
-      await context.read<AuthState>().login(_email.text.trim().toLowerCase(), _password.text);
-      if (mounted) _onSuccess();
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final ok = await vm.submit(_email.text, _password.text);
+    if (ok && mounted) _onSuccess();
   }
 
   Future<void> _goRegister() async {
@@ -109,6 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<LoginViewModel>();
     return AuthScaffold(
       showBack: !widget.embedded,
       child: Form(
@@ -121,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
               'Masuk',
               'Masuk untuk mendaftar kelas, memesan topeng, dan mengikuti forum diskusi',
             ),
-            if (_error != null) AuthErrorBanner(_error!),
+            if (vm.error != null) AuthErrorBanner(vm.error!),
             AuthField(
               label: 'Email',
               hint: 'Tulis Email Anda di sini',
@@ -148,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: InkWell(
-                onTap: _busy ? null : _goForgotPassword,
+                onTap: vm.busy ? null : _goForgotPassword,
                 borderRadius: BorderRadius.circular(6),
                 child: const Padding(
                   padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
@@ -164,12 +173,12 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            AuthButton(label: 'Masuk', busy: _busy, onPressed: _submit),
+            AuthButton(label: 'Masuk', busy: vm.busy, onPressed: _submit),
             const SizedBox(height: 10),
             AuthLink(
               lead: 'Belum punya akun?',
               action: 'Daftar Sekarang',
-              onTap: _busy ? null : _goRegister,
+              onTap: vm.busy ? null : _goRegister,
             ),
           ],
         ),
@@ -178,24 +187,33 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => RegisterViewModel(c.read<AuthState>()),
+      child: const _RegisterView(),
+    );
+  }
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterView extends StatefulWidget {
+  const _RegisterView();
+
+  @override
+  State<_RegisterView> createState() => _RegisterViewState();
+}
+
+class _RegisterViewState extends State<_RegisterView> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
-  bool _busy = false;
   bool _hide = true;
-  String? _emailServerError;
-  String? _error;
 
   @override
   void dispose() {
@@ -207,37 +225,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
-    setState(() {
-      _error = null;
-      _emailServerError = null;
-    });
+    final vm = context.read<RegisterViewModel>();
+    vm.clearErrors();
     if (!_form.currentState!.validate()) return;
-    setState(() => _busy = true);
-    try {
-      await context.read<AuthState>().register(
-            name: Validators.clean(_name.text),
-            email: _email.text.trim().toLowerCase(),
-            password: _password.text,
-            phone: _phone.text.replaceAll(RegExp(r'[\s\-]'), ''),
-          );
-      if (!mounted) return;
+    final ok = await vm.submit(
+      name: _name.text,
+      email: _email.text,
+      phone: _phone.text,
+      password: _password.text,
+    );
+    if (!mounted) return;
+    if (ok) {
       showSnack(context, 'Akun berhasil dibuat. Selamat datang!');
       Navigator.pop(context, true);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      if (e.status == 409) {
-        setState(() => _emailServerError = e.message);
-        _form.currentState!.validate();
-      } else {
-        setState(() => _error = e.message);
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    } else if (vm.emailServerError != null) {
+      _form.currentState!.validate();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<RegisterViewModel>();
     return AuthScaffold(
       child: Form(
         key: _form,
@@ -249,7 +257,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               'Daftar Akun',
               'Buat akun untuk bisa mendaftar kelas, memesan topeng, dan booking pentas',
             ),
-            if (_error != null) AuthErrorBanner(_error!),
+            if (vm.error != null) AuthErrorBanner(vm.error!),
             AuthField(
               label: 'Nama Lengkap',
               hint: 'Tulis nama Anda di sini',
@@ -266,8 +274,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               inputFormatters: InputFormats.maxLen(120),
-              onChanged: (_) => _emailServerError = null,
-              validator: (v) => Validators.email(v) ?? _emailServerError,
+              onChanged: (_) => vm.clearEmailServerError(),
+              validator: (v) => Validators.email(v) ?? vm.emailServerError,
             ),
             AuthField(
               label: 'Nomor HP/WhatsApp',
@@ -301,7 +309,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               onFieldSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: 4),
-            AuthButton(label: 'Daftar', busy: _busy, onPressed: _submit),
+            AuthButton(label: 'Daftar', busy: vm.busy, onPressed: _submit),
             const SizedBox(height: 10),
             AuthLink(
               lead: 'Sudah punya akun?',

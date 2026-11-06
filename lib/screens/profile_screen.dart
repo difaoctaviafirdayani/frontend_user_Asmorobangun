@@ -3,11 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/picker.dart';
 import '../core/routes.dart';
 import '../core/theme.dart';
+import '../repositories/auth_repository.dart';
+import '../viewmodels/profile_viewmodel.dart';
 import '../widgets/common.dart';
 import 'auth_screens.dart';
 
@@ -30,7 +31,10 @@ class ProfileScreen extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      body: const _ProfileBody(),
+      body: ChangeNotifierProvider(
+        create: (c) => ProfileViewModel(c.read<AuthRepository>(), c.read<AuthState>()),
+        child: const _ProfileBody(),
+      ),
     );
   }
 }
@@ -43,41 +47,21 @@ class _ProfileBody extends StatefulWidget {
 }
 
 class _ProfileBodyState extends State<_ProfileBody> {
-  bool _busy = false;
-  static const _maxAvatarBytes = 3 * 1024 * 1024;
-
   Future<void> _changeAvatar() async {
+    final vm = context.read<ProfileViewModel>();
     final f = await pickValidImage(context, allowGif: false);
     if (f == null) return;
-    if (f.bytes.length > _maxAvatarBytes) {
-      if (mounted) showSnack(context, 'Ukuran foto maksimal 3MB.');
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      final res = await api.upload('/auth/me/avatar', field: 'avatar', bytes: f.bytes, filename: f.name);
-      if (!mounted) return;
-      await context.read<AuthState>().setUserFromResponse(res);
-      if (mounted) showSnack(context, 'Foto profil diperbarui.');
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final ok = await vm.changeAvatar(f);
+    if (!mounted) return;
+    showSnack(context, ok ? 'Foto profil diperbarui.' : (vm.error ?? 'Terjadi kesalahan. Coba lagi.'));
   }
 
   Future<void> _removeAvatar() async {
     if (!await confirmDialog(context, 'Hapus foto profil?', okLabel: 'Hapus')) return;
-    setState(() => _busy = true);
-    try {
-      final res = await api.delete('/auth/me/avatar');
-      if (!mounted) return;
-      await context.read<AuthState>().setUserFromResponse(res);
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!mounted) return;
+    final vm = context.read<ProfileViewModel>();
+    final ok = await vm.removeAvatar();
+    if (!ok && mounted) showSnack(context, vm.error ?? 'Terjadi kesalahan. Coba lagi.');
   }
 
   Future<void> _logout() async {
@@ -99,6 +83,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ProfileViewModel>();
     final user = context.watch<AuthState>().user!;
     final hasAvatar = (user.avatar ?? '').isNotEmpty;
     final initial = user.name.trim().isEmpty ? '?' : user.name.trim()[0].toUpperCase();
@@ -121,7 +106,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
               shape: const CircleBorder(side: BorderSide(color: AppColors.line)),
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: _busy ? null : _changeAvatar,
+                onTap: vm.busy ? null : _changeAvatar,
                 child: const Padding(padding: EdgeInsets.all(5), child: Icon(Icons.edit_outlined, size: 14, color: AppColors.wood700)),
               ),
             ),
@@ -134,12 +119,12 @@ class _ProfileBodyState extends State<_ProfileBody> {
       if (hasAvatar)
         Center(
           child: TextButton(
-            onPressed: _busy ? null : _removeAvatar,
+            onPressed: vm.busy ? null : _removeAvatar,
             style: TextButton.styleFrom(visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 12)),
             child: const Text('Hapus foto profil'),
           ),
         ),
-      if (_busy) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator(color: AppColors.wood700)),
+      if (vm.busy) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator(color: AppColors.wood700)),
       const SizedBox(height: 20),
       if (user.role == 'admin')
         const Padding(
@@ -192,8 +177,8 @@ class _BubblePainter extends CustomPainter {
     final c = size.center(Offset.zero);
     final r = size.width / 2 - 1.5;
     final rect = Rect.fromCircle(center: c, radius: r);
-    final start = 160 * math.pi / 180;
-    final sweep = 310 * math.pi / 180;
+    const start = 160 * math.pi / 180;
+    const sweep = 310 * math.pi / 180;
     final a = Offset(c.dx + r * math.cos(start), c.dy + r * math.sin(start));
     final path = Path()
       ..moveTo(a.dx, a.dy)

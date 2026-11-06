@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
+import '../repositories/article_repository.dart';
+import '../viewmodels/article_detail_viewmodel.dart';
+import '../viewmodels/article_list_viewmodel.dart';
+import '../viewmodels/base_viewmodel.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 
 const _cardFill = Color(0xFFFDFBE8);
-const _baseCategories = ['Sejarah', 'Budaya', 'Acara'];
 
-class ArticlesScreen extends StatefulWidget {
+class ArticlesScreen extends StatelessWidget {
   const ArticlesScreen({super.key});
 
   @override
-  State<ArticlesScreen> createState() => _ArticlesScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => ArticleListViewModel(c.read<ArticleRepository>())..load(),
+      child: const _ArticlesView(),
+    );
+  }
 }
 
-class _ArticlesScreenState extends State<ArticlesScreen> {
+class _ArticlesView extends StatefulWidget {
+  const _ArticlesView();
+
+  @override
+  State<_ArticlesView> createState() => _ArticlesViewState();
+}
+
+class _ArticlesViewState extends State<_ArticlesView> {
   final _search = TextEditingController();
-  String _category = '';
-  String _query = '';
-  late Future<List<Article>> _future = _load();
 
   @override
   void dispose() {
@@ -28,90 +41,64 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     super.dispose();
   }
 
-  Future<List<Article>> _load() async =>
-      mapList((await api.get('/articles'))['articles'], Article.fromJson);
-
-  void _refresh() => setState(() => _future = _load());
-
   void _openDetail(Article a) => Navigator.push(
       context, MaterialPageRoute(builder: (_) => ArticleDetailScreen(slug: a.slug)));
 
-  DateTime _dateOf(Article a) => DateTime.tryParse(a.date) ?? DateTime.fromMillisecondsSinceEpoch(0);
-
-  List<String> _categoriesOf(List<Article> all) {
-    final extra = <String>[];
-    for (final a in all) {
-      final c = a.category.trim();
-      if (c.isEmpty) continue;
-      final known = [..._baseCategories, ...extra].any((e) => e.toLowerCase() == c.toLowerCase());
-      if (!known) extra.add(c);
-    }
-    return [..._baseCategories, ...extra];
-  }
-
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ArticleListViewModel>();
     return AppScaffold(
       title: 'Berita dan Artikel',
       backgroundColor: Colors.white,
-      body: FutureBuilder<List<Article>>(
-        future: _future,
-        builder: (context, snap) {
-          final all = snap.data ?? const <Article>[];
-          final loading = snap.connectionState != ConnectionState.done;
-
-          final q = _query.trim().toLowerCase();
-          final filtered = all.where((a) {
-            final okCat = _category.isEmpty || a.category.toLowerCase() == _category.toLowerCase();
-            final okQuery = q.isEmpty || a.title.toLowerCase().contains(q);
-            return okCat && okQuery;
-          }).toList()
-            ..sort((a, b) => _dateOf(b).compareTo(_dateOf(a)));
-
-          final showFeatured = q.isEmpty && _category.isEmpty && filtered.isNotEmpty;
-          Article? featured;
-          if (showFeatured) {
-            featured = filtered.first;
-          }
-          final list = showFeatured ? filtered.where((a) => a.id != featured!.id).toList() : filtered;
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-            children: [
-              _searchBar(),
-              const SizedBox(height: 14),
-              _dropdown(_categoriesOf(all)),
-              const SizedBox(height: 18),
-              if (loading)
-                const Padding(
-                  padding: EdgeInsets.only(top: 60),
-                  child: Center(child: CircularProgressIndicator(color: AppColors.gold400)),
-                )
-              else if (snap.hasError)
-                SizedBox(height: 300, child: ErrorView(message: snap.error.toString(), onRetry: _refresh))
-              else if (filtered.isEmpty)
-                const SizedBox(height: 300, child: EmptyState('Tidak ada artikel yang cocok.', icon: Icons.article_outlined))
-              else ...[
-                if (featured != null) ...[
-                  _featuredCard(featured),
-                  const SizedBox(height: 20),
-                ],
-                if (list.isNotEmpty) ...[
-                  Text('Semua Artikel', style: headingStyle(size: 20, color: AppColors.wood700)),
-                  const SizedBox(height: 10),
-                  for (final a in list) Padding(padding: const EdgeInsets.only(bottom: 12), child: _listCard(a)),
-                ],
-              ],
-            ],
-          );
-        },
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+        children: [
+          _searchBar(vm),
+          const SizedBox(height: 14),
+          _dropdown(vm),
+          const SizedBox(height: 18),
+          ..._content(vm),
+        ],
       ),
     );
   }
 
-  Widget _searchBar() => TextField(
+  List<Widget> _content(ArticleListViewModel vm) {
+    switch (vm.status) {
+      case LoadStatus.loading:
+        return const [
+          Padding(
+            padding: EdgeInsets.only(top: 60),
+            child: Center(child: CircularProgressIndicator(color: AppColors.gold400)),
+          ),
+        ];
+      case LoadStatus.error:
+        return [SizedBox(height: 300, child: ErrorView(message: vm.error ?? '', onRetry: vm.load))];
+      case LoadStatus.success:
+        if (vm.filtered.isEmpty) {
+          return const [
+            SizedBox(height: 300, child: EmptyState('Tidak ada artikel yang cocok.', icon: Icons.article_outlined)),
+          ];
+        }
+        final featured = vm.featured;
+        final list = vm.others;
+        return [
+          if (featured != null) ...[
+            _featuredCard(featured),
+            const SizedBox(height: 20),
+          ],
+          if (list.isNotEmpty) ...[
+            Text('Semua Artikel', style: headingStyle(size: 20, color: AppColors.wood700)),
+            const SizedBox(height: 10),
+            for (final a in list) Padding(padding: const EdgeInsets.only(bottom: 12), child: _listCard(a)),
+          ],
+        ];
+    }
+  }
+
+  Widget _searchBar(ArticleListViewModel vm) => TextField(
         controller: _search,
-        onChanged: (v) => setState(() => _query = v),
+        onChanged: vm.setQuery,
         textInputAction: TextInputAction.search,
         cursorColor: Colors.white,
         style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -119,13 +106,13 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           hintText: 'Cari berita atau artikel',
           hintStyle: const TextStyle(color: Colors.white, fontSize: 16),
           prefixIcon: const Icon(Icons.search_rounded, color: Colors.white),
-          suffixIcon: _query.isEmpty
+          suffixIcon: vm.query.isEmpty
               ? null
               : IconButton(
                   icon: const Icon(Icons.close_rounded, color: Colors.white),
                   onPressed: () {
                     _search.clear();
-                    setState(() => _query = '');
+                    vm.setQuery('');
                   },
                 ),
           filled: true,
@@ -137,9 +124,9 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
         ),
       );
 
-  Widget _dropdown(List<String> cats) {
-    final items = ['', ...cats];
-    final value = items.contains(_category) ? _category : '';
+  Widget _dropdown(ArticleListViewModel vm) {
+    final items = ['', ...vm.categories];
+    final value = items.contains(vm.category) ? vm.category : '';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -162,7 +149,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                 child: Text(c.isEmpty ? 'Semua kategori' : c),
               ),
           ],
-          onChanged: (v) => setState(() => _category = v ?? ''),
+          onChanged: (v) => vm.setCategory(v ?? ''),
         ),
       ),
     );
@@ -245,13 +232,33 @@ class ArticleDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => ArticleDetailViewModel(c.read<ArticleRepository>(), slug)..load(),
+      child: const _ArticleDetailView(),
+    );
+  }
+}
+
+class _ArticleDetailView extends StatelessWidget {
+  const _ArticleDetailView();
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<ArticleDetailViewModel>();
     return AppScaffold(
       title: 'Berita dan Artikel',
       backgroundColor: Colors.white,
-      body: AsyncView<Article>(
-        loader: () async => Article.fromJson(
-            (await api.get('/articles/${Uri.encodeComponent(slug)}'))['article'] as Map<String, dynamic>),
-        builder: (context, a, _) => ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 28), children: [
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (_) => _content(vm.article!),
+      ),
+    );
+  }
+
+  Widget _content(Article a) =>
+      ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 28), children: [
           NetImage(src: a.image, height: 220, width: double.infinity, radius: BorderRadius.circular(22)),
           const SizedBox(height: 14),
           Align(
@@ -274,8 +281,5 @@ class ArticleDetailScreen extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Text(para.trim(), style: const TextStyle(height: 1.55, fontSize: 15.5, color: AppColors.wood700)),
               ),
-        ]),
-      ),
-    );
-  }
+  ]);
 }

@@ -1,11 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// LAPISAN 5 (bagian "data tersimpan"): ENKRIPSI AT-REST.
-///
-/// Token login dan data profil disimpan lewat flutter_secure_storage:
-///  - Android: dienkripsi AES, kuncinya dijaga Android Keystore
-///  - iOS    : disimpan di Keychain
-/// Jadi token tidak tergeletak sebagai teks biasa seperti pada SharedPreferences.
 class SecureStore {
   SecureStore._();
   static final SecureStore instance = SecureStore._();
@@ -19,7 +13,6 @@ class SecureStore {
     try {
       return await _storage.read(key: key);
     } catch (_) {
-      // Keystore bisa rusak setelah restore perangkat. Hapus agar tidak macet.
       await clear();
       return null;
     }

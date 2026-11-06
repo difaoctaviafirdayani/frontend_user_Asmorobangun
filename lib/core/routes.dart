@@ -8,28 +8,20 @@ import '../screens/topeng_screen.dart';
 import '../widgets/common.dart';
 import 'auth_state.dart';
 
-/// Nama-nama rute untuk Navigator.
 class Routes {
   Routes._();
   static const home = '/';
   static const login = '/login';
   static const register = '/register';
-  static const forgotPassword = '/forgot-password'; // arguments (opsional): String email
-  static const myOrders = '/my-orders'; // butuh login
-  static const order = '/order'; // butuh login, arguments: String orderId
+  static const forgotPassword = '/forgot-password';
+  static const myOrders = '/my-orders';
+  static const order = '/order';
 }
 
-/// LAPISAN 4 (sisi klien): OTORISASI RUTE.
-/// Rute di [_protected] hanya boleh dibuka oleh pengguna yang sudah login dan
-/// berperan sesuai. Bila belum, pengguna diarahkan ke halaman masuk lalu
-/// dikembalikan ke tujuan semula (lihat LoginScreen.redirect).
-/// Ini hanya pagar di aplikasi. Pagar yang sebenarnya ada di server:
-/// tiap endpoint memeriksa token, peran (requireAdmin), dan kepemilikan data.
 class AppRouter {
   final AuthState auth;
   AppRouter(this.auth);
 
-  /// rute -> peran yang diizinkan (kosong berarti semua peran yang sudah login).
   static const Map<String, Set<String>> _protected = {
     Routes.myOrders: {},
     Routes.order: {},
@@ -39,11 +31,9 @@ class AppRouter {
     final name = settings.name ?? Routes.home;
 
     if (_protected.containsKey(name)) {
-      // Autentikasi: harus login dan token belum kedaluwarsa.
       if (!auth.ensureSessionValid()) {
         return _page(settings, LoginScreen(redirect: settings));
       }
-      // Otorisasi: peran harus termasuk yang diizinkan (bila dibatasi).
       final roles = _protected[name]!;
       if (roles.isNotEmpty && !roles.contains(auth.user?.role)) {
         return _page(settings, const _ForbiddenScreen());
@@ -64,8 +54,9 @@ class AppRouter {
         return _page(settings, const MyOrdersScreen());
       case Routes.order:
         final id = settings.arguments;
-        if (id is String && id.isNotEmpty)
+        if (id is String && id.isNotEmpty) {
           return _page(settings, OrderDetailScreen(orderId: id));
+        }
         return _page(settings, const _NotFoundScreen());
       default:
         return _page(settings, const _NotFoundScreen());

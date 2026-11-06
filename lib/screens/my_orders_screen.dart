@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/format.dart';
 import '../core/routes.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
+import '../repositories/facility_repository.dart';
+import '../repositories/topeng_repository.dart';
+import '../viewmodels/booking_detail_viewmodel.dart';
+import '../viewmodels/my_orders_viewmodel.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 import '../widgets/payment_section.dart';
 import '../widgets/reviews.dart';
 
@@ -17,6 +22,16 @@ class MyOrdersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (c) => TopengOrdersViewModel(c.read<TopengRepository>())..load()),
+        ChangeNotifierProvider(create: (c) => BookingsViewModel(c.read<FacilityRepository>())..load()),
+      ],
+      child: _tabs(),
+    );
+  }
+
+  Widget _tabs() {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -165,9 +180,14 @@ class _TopengOrdersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AsyncView<List<TopengOrder>>(
-      loader: () async => mapList((await api.get('/topeng/orders/mine'))['orders'], TopengOrder.fromJson),
-      builder: (context, items, reload) {
+    final vm = context.watch<TopengOrdersViewModel>();
+    final reload = vm.load;
+    return LoadStatusView(
+      status: vm.status,
+      error: vm.error,
+      onRetry: reload,
+      builder: (context) {
+        final items = vm.data!;
         if (items.isEmpty) return const EmptyState('Belum ada pesanan topeng.', icon: Icons.face_retouching_natural_outlined);
         return RefreshIndicator(
           onRefresh: () async => reload(),
@@ -178,13 +198,12 @@ class _TopengOrdersTab extends StatelessWidget {
             itemBuilder: (context, i) {
               final o = items[i];
               final review = _reviewButton(context,
-                  status: o.status, review: o.review, path: '/topeng/orders/${o.id}/review', reload: reload);
+                  status: o.status, review: o.review, path: vm.reviewPath(o), reload: reload);
               return _OrderCard(
                 status: o.status,
                 title: '${o.topengName} (${o.qty} pcs)',
                 price: formatRupiah(o.total),
                 date: formatDateLong(o.createdAt),
-                // Navigator rute bernama + argumen; kembali dari detail menyegarkan daftar.
                 onTap: () => Navigator.pushNamed(context, Routes.order, arguments: o.id).then((_) => reload()),
                 actions: [
                   if (review != null) review,
@@ -204,9 +223,14 @@ class _BookingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AsyncView<List<Booking>>(
-      loader: () async => mapList((await api.get('/bookings/mine'))['bookings'], Booking.fromJson),
-      builder: (context, items, reload) {
+    final vm = context.watch<BookingsViewModel>();
+    final reload = vm.load;
+    return LoadStatusView(
+      status: vm.status,
+      error: vm.error,
+      onRetry: reload,
+      builder: (context) {
+        final items = vm.data!;
         if (items.isEmpty) return const EmptyState('Belum ada pendaftaran atau booking.', icon: Icons.event_note_outlined);
         return RefreshIndicator(
           onRefresh: () async => reload(),
@@ -218,7 +242,7 @@ class _BookingsTab extends StatelessWidget {
               final b = items[i];
               final needsPayment = b.status == 'menunggu_pembayaran';
               final review = _reviewButton(context,
-                  status: b.status, review: b.review, path: '/bookings/${b.id}/review', reload: reload);
+                  status: b.status, review: b.review, path: vm.reviewPath(b), reload: reload);
               void openDetail() => Navigator.push(context, MaterialPageRoute(builder: (_) => BookingDetailScreen(booking: b))).then((_) => reload());
               return _OrderCard(
                 status: b.status,
@@ -244,6 +268,19 @@ class BookingDetailScreen extends StatelessWidget {
   final Booking booking;
   const BookingDetailScreen({super.key, required this.booking});
 
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => BookingDetailViewModel(c.read<FacilityRepository>(), booking)..load(),
+      child: _BookingDetailView(booking: booking),
+    );
+  }
+}
+
+class _BookingDetailView extends StatelessWidget {
+  final Booking booking;
+  const _BookingDetailView({required this.booking});
+
   String? _statusNote(Booking b) {
     switch (b.status) {
       case 'menunggu_kedatangan':
@@ -264,6 +301,7 @@ class BookingDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<BookingDetailViewModel>();
     final b = booking;
     final note = _statusNote(b);
     final needsPayment = b.status == 'menunggu_pembayaran';
@@ -272,11 +310,13 @@ class BookingDetailScreen extends StatelessWidget {
     return AppScaffold(
       title: 'Layanan Sanggar',
       backgroundColor: Colors.white,
-      body: AsyncView<Facility?>(
-        loader: () async => needsPayment
-            ? Facility.fromJson((await api.get('/facilities/${Uri.encodeComponent(b.facilityId)}'))['facility'] as Map<String, dynamic>)
-            : null,
-        builder: (context, f, _) => ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 40), children: [
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (context) {
+          final f = vm.data;
+          return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 40), children: [
           paymentHeading('Detail Transaksi'),
           TransactionBox(status: b.status, rows: [
             ('Nama Layanan', b.facilityName),
@@ -329,7 +369,8 @@ class BookingDetailScreen extends StatelessWidget {
               ),
             ],
           ],
-        ]),
+        ]);
+        },
       ),
     );
   }

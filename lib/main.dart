@@ -3,15 +3,24 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'core/api.dart';
 import 'core/auth_state.dart';
 import 'core/error_reporter.dart';
 import 'core/routes.dart';
 import 'core/theme.dart';
+import 'repositories/announcement_repository.dart';
+import 'repositories/article_repository.dart';
+import 'repositories/auth_repository.dart';
+import 'repositories/facility_repository.dart';
+import 'repositories/forum_repository.dart';
+import 'repositories/gallery_repository.dart';
+import 'repositories/payment_repository.dart';
+import 'repositories/review_repository.dart';
+import 'repositories/topeng_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Error dari aplikasi user dikirim ke backend -> tampil di lonceng admin.
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     ErrorReporter.report(details.exceptionAsString(), path: 'flutter', detail: details.stack);
@@ -54,8 +63,6 @@ class _AsmorobangunAppState extends State<AsmorobangunApp> {
     super.dispose();
   }
 
-  /// Saat pengguna keluar (tombol Keluar, token habis, atau ditolak server),
-  /// bersihkan seluruh tumpukan halaman agar layar yang butuh login tidak tertinggal.
   void _onAuthChanged() {
     final auth = widget.auth;
     if (_wasLoggedIn && !auth.isLoggedIn) {
@@ -74,15 +81,28 @@ class _AsmorobangunAppState extends State<AsmorobangunApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Asmorobangun',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      navigatorKey: _navigatorKey,
-      scaffoldMessengerKey: _messengerKey,
-      initialRoute: Routes.home,
-      onGenerateRoute: _router.onGenerateRoute,
-      onUnknownRoute: _router.onUnknownRoute,
+    return MultiProvider(
+      providers: [
+        Provider<AnnouncementRepository>(create: (_) => AnnouncementRepository(api)),
+        Provider<ArticleRepository>(create: (_) => ArticleRepository(api)),
+        Provider<AuthRepository>.value(value: widget.auth.repository),
+        Provider<FacilityRepository>(create: (_) => FacilityRepository(api)),
+        Provider<ForumRepository>(create: (_) => ForumRepository(api)),
+        Provider<GalleryRepository>(create: (_) => GalleryRepository(api)),
+        Provider<PaymentRepository>(create: (_) => PaymentRepository(api)),
+        Provider<ReviewRepository>(create: (_) => ReviewRepository(api)),
+        Provider<TopengRepository>(create: (_) => TopengRepository(api)),
+      ],
+      child: MaterialApp(
+        title: 'Asmorobangun',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        navigatorKey: _navigatorKey,
+        scaffoldMessengerKey: _messengerKey,
+        initialRoute: Routes.home,
+        onGenerateRoute: _router.onGenerateRoute,
+        onUnknownRoute: _router.onUnknownRoute,
+      ),
     );
   }
 }

@@ -1,22 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
+import '../repositories/gallery_repository.dart';
+import '../viewmodels/gallery_viewmodel.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 
 class GalleryScreen extends StatelessWidget {
   const GalleryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => GalleryViewModel(c.read<GalleryRepository>())..load(),
+      child: const _GalleryView(),
+    );
+  }
+}
+
+class _GalleryView extends StatelessWidget {
+  const _GalleryView();
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<GalleryViewModel>();
     return AppScaffold(
       title: 'Galeri Sanggar',
       backgroundColor: Colors.white,
-      body: AsyncView<List<GalleryItem>>(
-        loader: () async => mapList((await api.get('/gallery'))['gallery'], GalleryItem.fromJson),
-        builder: (context, items, _) {
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (context) {
+          final items = vm.data!;
           if (items.isEmpty) return const EmptyState('Belum ada foto galeri.', icon: Icons.photo_library_outlined);
           return GridView.builder(
             padding: const EdgeInsets.all(16),

@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/config.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
+import '../repositories/announcement_repository.dart';
+import '../repositories/article_repository.dart';
+import '../repositories/facility_repository.dart';
+import '../repositories/gallery_repository.dart';
+import '../viewmodels/home_viewmodel.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 import '../widgets/location_map.dart';
 import 'announcements_screen.dart';
 import 'articles_screen.dart';
@@ -17,6 +23,24 @@ class HomeScreen extends StatelessWidget {
   final ValueChanged<int> onNavigate;
   const HomeScreen({super.key, required this.onNavigate});
 
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => HomeViewModel(
+        c.read<AnnouncementRepository>(),
+        c.read<ArticleRepository>(),
+        c.read<FacilityRepository>(),
+        c.read<GalleryRepository>(),
+      )..loadAll(),
+      child: _HomeView(onNavigate: onNavigate),
+    );
+  }
+}
+
+class _HomeView extends StatelessWidget {
+  final ValueChanged<int> onNavigate;
+  const _HomeView({required this.onNavigate});
+
   static const double _pad = 20;
 
   void _push(BuildContext context, Widget page) =>
@@ -24,6 +48,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<HomeViewModel>();
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -40,25 +65,25 @@ class HomeScreen extends StatelessWidget {
                   onAction: () =>
                       _push(context, const AnnouncementsScreen()),
                 ),
-                _announcements(context),
+                _announcements(context, vm),
                 _SectionTitle(
                   'Berita dan Artikel',
                   actionLabel: 'Lihat semua',
                   onAction: () => _push(context, const ArticlesScreen()),
                 ),
-                _featuredArticle(context),
+                _featuredArticle(context, vm),
                 _SectionTitle(
                   'Layanan Sanggar',
                   actionLabel: 'Lihat semua',
                   onAction: () => onNavigate(1),
                 ),
-                _facilities(context),
+                _facilities(context, vm),
                 _SectionTitle(
                   'Galeri Sanggar',
                   actionLabel: 'Lihat semua',
                   onAction: () => _push(context, const GalleryScreen()),
                 ),
-                _gallery(context),
+                _gallery(context, vm),
                 const _SectionTitle('Lokasi Kami'),
                 _location(context),
                 _SectionTitle(
@@ -165,13 +190,13 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _announcements(BuildContext context) {
-    return AsyncView<List<Announcement>>(
-      loader: () async => mapList(
-        (await api.get('/announcements'))['announcements'],
-        Announcement.fromJson,
-      ),
-      builder: (context, items, _) {
+  Widget _announcements(BuildContext context, HomeViewModel vm) {
+    return LoadStatusView(
+      status: vm.announcements.status,
+      error: vm.announcements.error,
+      onRetry: vm.loadAnnouncements,
+      builder: (context) {
+        final items = vm.announcements.data!;
         if (items.isEmpty) {
           return const EmptyState('Belum ada pengumuman.');
         }
@@ -246,21 +271,13 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _featuredArticle(BuildContext context) {
-    return AsyncView<Article?>(
-      loader: () async {
-        final res = await api.get(
-          '/articles',
-          query: {'limit': '1'},
-        );
-
-        return res['featured'] is Map<String, dynamic>
-            ? Article.fromJson(
-                res['featured'] as Map<String, dynamic>,
-              )
-            : null;
-      },
-      builder: (context, a, _) {
+  Widget _featuredArticle(BuildContext context, HomeViewModel vm) {
+    return LoadStatusView(
+      status: vm.featuredArticle.status,
+      error: vm.featuredArticle.error,
+      onRetry: vm.loadFeaturedArticle,
+      builder: (context) {
+        final a = vm.featuredArticle.data;
         if (a == null) {
           return const EmptyState('Belum ada artikel.');
         }
@@ -296,13 +313,13 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _facilities(BuildContext context) {
-    return AsyncView<List<Facility>>(
-      loader: () async => mapList(
-        (await api.get('/facilities'))['facilities'],
-        Facility.fromJson,
-      ),
-      builder: (context, items, _) {
+  Widget _facilities(BuildContext context, HomeViewModel vm) {
+    return LoadStatusView(
+      status: vm.facilities.status,
+      error: vm.facilities.error,
+      onRetry: vm.loadFacilities,
+      builder: (context) {
+        final items = vm.facilities.data!;
         if (items.isEmpty) {
           return const EmptyState('Belum ada layanan.');
         }
@@ -328,13 +345,13 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _gallery(BuildContext context) {
-    return AsyncView<List<GalleryItem>>(
-      loader: () async => mapList(
-        (await api.get('/gallery'))['gallery'],
-        GalleryItem.fromJson,
-      ),
-      builder: (context, items, _) {
+  Widget _gallery(BuildContext context, HomeViewModel vm) {
+    return LoadStatusView(
+      status: vm.gallery.status,
+      error: vm.gallery.error,
+      onRetry: vm.loadGallery,
+      builder: (context) {
+        final items = vm.gallery.data!;
         if (items.isEmpty) {
           return const EmptyState('Belum ada foto galeri.');
         }
@@ -511,9 +528,9 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(
-          HomeScreen._pad,
+          _HomeView._pad,
           22,
-          HomeScreen._pad,
+          _HomeView._pad,
           10,
         ),
         child: Row(

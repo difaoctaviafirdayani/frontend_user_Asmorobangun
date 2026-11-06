@@ -1,40 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../core/validators.dart';
-import '../models/models.dart';
+import '../repositories/forum_repository.dart';
+import '../viewmodels/base_viewmodel.dart';
+import '../viewmodels/forum_list_viewmodel.dart';
+import '../viewmodels/new_thread_viewmodel.dart';
+import '../viewmodels/thread_detail_viewmodel.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 import 'auth_screens.dart';
 
-const _defaultCategories = ['Diskusi Umum', 'Kelas Tari', 'Karawitan', 'Topeng', 'Acara & Booking'];
-
-Future<List<String>> _loadCategories() async {
-  try {
-    final res = await api.get('/forum/categories');
-    final list = res['categories'];
-    if (list is List && list.isNotEmpty) return list.map((e) => e.toString()).toList();
-  } on ApiException {}
-  return _defaultCategories;
-}
-
-const _filterCategories = ['Diskusi Umum', 'Layanan'];
-
-class ForumScreen extends StatefulWidget {
+class ForumScreen extends StatelessWidget {
   const ForumScreen({super.key});
 
   @override
-  State<ForumScreen> createState() => _ForumScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => ForumListViewModel(c.read<ForumRepository>())..load(),
+      child: const _ForumView(),
+    );
+  }
 }
 
-class _ForumScreenState extends State<ForumScreen> {
+class _ForumView extends StatefulWidget {
+  const _ForumView();
+
+  @override
+  State<_ForumView> createState() => _ForumViewState();
+}
+
+class _ForumViewState extends State<_ForumView> {
   final _search = TextEditingController();
-  String _category = '';
-  String _query = '';
-  late Future<List<ThreadSummary>> _future = _load();
 
   @override
   void dispose() {
@@ -42,42 +42,33 @@ class _ForumScreenState extends State<ForumScreen> {
     super.dispose();
   }
 
-  Future<List<ThreadSummary>> _load() async =>
-      mapList((await api.get('/forum'))['threads'], ThreadSummary.fromJson);
-
-  void _refresh() {
-    final future = _load();
-    setState(() {
-      _future = future;
-    });
-  }
-
   Future<void> _newThread() async {
+    final vm = context.read<ForumListViewModel>();
     if (!await ensureLogin(context)) return;
     if (!mounted) return;
     final created = await showNewThreadSheet(context);
-    if (created == true) _refresh();
+    if (created == true) vm.load();
   }
 
   OutlineInputBorder _noBorder() =>
       OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none);
 
-  Widget _searchBar() => TextField(
+  Widget _searchBar(ForumListViewModel vm) => TextField(
         controller: _search,
-        onChanged: (v) => setState(() => _query = v),
+        onChanged: vm.setQuery,
         cursorColor: Colors.white,
         style: const TextStyle(color: Colors.white, fontSize: 16),
         decoration: InputDecoration(
           hintText: 'Cari topik diskusi',
           hintStyle: const TextStyle(color: Colors.white, fontSize: 16),
           prefixIcon: const Icon(Icons.search_rounded, color: Colors.white),
-          suffixIcon: _query.isEmpty
+          suffixIcon: vm.query.isEmpty
               ? null
               : IconButton(
                   icon: const Icon(Icons.close_rounded, color: Colors.white),
                   onPressed: () {
                     _search.clear();
-                    setState(() => _query = '');
+                    vm.setQuery('');
                   },
                 ),
           filled: true,
@@ -89,8 +80,8 @@ class _ForumScreenState extends State<ForumScreen> {
         ),
       );
 
-  Widget _filterDropdown() {
-    final items = ['', ..._filterCategories];
+  Widget _filterDropdown(ForumListViewModel vm) {
+    final items = ['', ...ForumListViewModel.filterCategories];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -100,7 +91,7 @@ class _ForumScreenState extends State<ForumScreen> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: _category,
+          value: vm.category,
           isExpanded: true,
           borderRadius: BorderRadius.circular(16),
           dropdownColor: Colors.white,
@@ -109,7 +100,7 @@ class _ForumScreenState extends State<ForumScreen> {
           items: [
             for (final c in items) DropdownMenuItem(value: c, child: Text(c.isEmpty ? 'Semua kategori' : c)),
           ],
-          onChanged: (v) => setState(() => _category = v ?? ''),
+          onChanged: (v) => vm.setCategory(v ?? ''),
         ),
       ),
     );
@@ -117,6 +108,7 @@ class _ForumScreenState extends State<ForumScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ForumListViewModel>();
     return AppScaffold(
       title: 'Forum Diskusi',
       backgroundColor: Colors.white,
@@ -131,67 +123,62 @@ class _ForumScreenState extends State<ForumScreen> {
       body: Column(children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: _searchBar(),
+          child: _searchBar(vm),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: _filterDropdown(),
+          child: _filterDropdown(vm),
         ),
-        Expanded(
-          child: FutureBuilder<List<ThreadSummary>>(
-            future: _future,
-            builder: (context, snap) {
-              if (snap.connectionState != ConnectionState.done) {
-                return const Center(child: CircularProgressIndicator(color: AppColors.gold400));
-              }
-              if (snap.hasError) return ErrorView(message: snap.error.toString(), onRetry: _refresh);
-              final q = _query.trim().toLowerCase();
-              final items = (snap.data ?? []).where((t) {
-                final okCat = _category.isEmpty || t.category.toLowerCase() == _category.toLowerCase();
-                final okQ = q.isEmpty || t.title.toLowerCase().contains(q);
-                return okCat && okQ;
-              }).toList();
-              if (items.isEmpty) {
-                return EmptyState(
-                  (snap.data ?? []).isEmpty ? 'Belum ada diskusi. Mulai yang pertama!' : 'Tidak ada diskusi yang cocok.',
-                  icon: Icons.forum_outlined,
-                );
-              }
-              return RefreshIndicator(
-                onRefresh: () async => _refresh(),
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) {
-                    final t = items[i];
-                    return InkWell(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ThreadScreen(id: t.id)))
-                          .then((_) => _refresh()),
-                      child: Container(
-                        padding: const EdgeInsets.fromLTRB(2, 12, 2, 10),
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AppColors.wood700, width: 1.2)),
-                        ),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(t.category.toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.wood700)),
-                          const SizedBox(height: 2),
-                          Text(t.title,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, height: 1.35, color: AppColors.wood700)),
-                          const SizedBox(height: 2),
-                          Text('${t.userName} - ${formatDateLong(t.date)} - ${t.replyCount} balasan',
-                              style: const TextStyle(fontSize: 14, color: AppColors.wood700)),
-                        ]),
-                      ),
-                    );
-                  },
+        Expanded(child: _list(vm)),
+      ]),
+    );
+  }
+
+  Widget _list(ForumListViewModel vm) {
+    switch (vm.status) {
+      case LoadStatus.loading:
+        return const Center(child: CircularProgressIndicator(color: AppColors.gold400));
+      case LoadStatus.error:
+        return ErrorView(message: vm.error ?? '', onRetry: vm.load);
+      case LoadStatus.success:
+        final items = vm.threads;
+        if (items.isEmpty) {
+          return EmptyState(
+            vm.isEmptyOnServer ? 'Belum ada diskusi. Mulai yang pertama!' : 'Tidak ada diskusi yang cocok.',
+            icon: Icons.forum_outlined,
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async => vm.load(),
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+            itemCount: items.length,
+            itemBuilder: (context, i) {
+              final t = items[i];
+              return InkWell(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ThreadScreen(id: t.id)))
+                    .then((_) => vm.load()),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(2, 12, 2, 10),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.wood700, width: 1.2)),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t.category.toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.wood700)),
+                    const SizedBox(height: 2),
+                    Text(t.title,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, height: 1.35, color: AppColors.wood700)),
+                    const SizedBox(height: 2),
+                    Text('${t.userName} - ${formatDateLong(t.date)} - ${t.replyCount} balasan',
+                        style: const TextStyle(fontSize: 14, color: AppColors.wood700)),
+                  ]),
                 ),
               );
             },
           ),
-        ),
-      ]),
-    );
+        );
+    }
   }
 }
 
@@ -205,20 +192,29 @@ Future<bool?> showNewThreadSheet(BuildContext context) {
   );
 }
 
-class NewThreadSheet extends StatefulWidget {
+class NewThreadSheet extends StatelessWidget {
   const NewThreadSheet({super.key});
 
   @override
-  State<NewThreadSheet> createState() => _NewThreadSheetState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => NewThreadViewModel(c.read<ForumRepository>())..loadCategories(),
+      child: const _NewThreadForm(),
+    );
+  }
 }
 
-class _NewThreadSheetState extends State<NewThreadSheet> {
+class _NewThreadForm extends StatefulWidget {
+  const _NewThreadForm();
+
+  @override
+  State<_NewThreadForm> createState() => _NewThreadFormState();
+}
+
+class _NewThreadFormState extends State<_NewThreadForm> {
   final _form = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _content = TextEditingController();
-  String _category = _defaultCategories.first;
-  bool _busy = false;
-  late final Future<List<String>> _categories = _loadCategories();
 
   @override
   void dispose() {
@@ -229,20 +225,14 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    setState(() => _busy = true);
-    try {
-      await api.post('/forum', body: {
-        'title': Validators.clean(_title.text),
-        'content': Validators.clean(_content.text),
-        'category': _category,
-      });
-      if (!mounted) return;
+    final vm = context.read<NewThreadViewModel>();
+    final ok = await vm.submit(title: _title.text, content: _content.text);
+    if (!mounted) return;
+    if (ok) {
       showSnack(context, 'Diskusi dibuat!');
       Navigator.pop(context, true);
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    } else {
+      showSnack(context, vm.error ?? 'Terjadi kesalahan. Coba lagi.');
     }
   }
 
@@ -272,6 +262,7 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<NewThreadViewModel>();
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: keyboard),
@@ -293,20 +284,16 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
                 Text('Mulai Diskusi Baru', style: headingStyle(size: 28, color: AppColors.wood800)),
                 const SizedBox(height: 18),
                 _label('Kategori'),
-                FutureBuilder<List<String>>(
-                  future: _categories,
-                  builder: (context, snap) {
-                    final cats = snap.data ?? _defaultCategories;
-                    if (!cats.contains(_category)) _category = cats.first;
-                    return DropdownButtonFormField<String>(
-                      value: _category,
-                      isExpanded: true,
-                      decoration: _dec(''),
-                      borderRadius: BorderRadius.circular(16),
-                      dropdownColor: Colors.white,
-                      items: [for (final c in cats) DropdownMenuItem(value: c, child: Text(c))],
-                      onChanged: (v) => setState(() => _category = v ?? _category),
-                    );
+                DropdownButtonFormField<String>(
+                  key: ValueKey('${vm.categories.length}-${vm.selectedCategory}'),
+                  initialValue: vm.selectedCategory,
+                  isExpanded: true,
+                  decoration: _dec(''),
+                  borderRadius: BorderRadius.circular(16),
+                  dropdownColor: Colors.white,
+                  items: [for (final c in vm.categories) DropdownMenuItem(value: c, child: Text(c))],
+                  onChanged: (v) {
+                    if (v != null) vm.selectCategory(v);
                   },
                 ),
                 const SizedBox(height: 14),
@@ -331,7 +318,7 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
                 Row(children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _busy ? null : () => Navigator.pop(context),
+                      onPressed: vm.busy ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         backgroundColor: const Color(0xFFFDFAE8),
                         side: const BorderSide(color: AppColors.wood800, width: 1.5),
@@ -344,12 +331,12 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _busy ? null : _submit,
+                      onPressed: vm.busy ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: Text(_busy ? 'Mengirim...' : 'Kirim', style: const TextStyle(fontSize: 18)),
+                      child: Text(vm.busy ? 'Mengirim...' : 'Kirim', style: const TextStyle(fontSize: 18)),
                     ),
                   ),
                 ]),
@@ -362,22 +349,29 @@ class _NewThreadSheetState extends State<NewThreadSheet> {
   }
 }
 
-class ThreadScreen extends StatefulWidget {
+class ThreadScreen extends StatelessWidget {
   final String id;
   const ThreadScreen({super.key, required this.id});
 
   @override
-  State<ThreadScreen> createState() => _ThreadScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => ThreadDetailViewModel(c.read<ForumRepository>(), id)..load(),
+      child: const _ThreadView(),
+    );
+  }
 }
 
-class _ThreadScreenState extends State<ThreadScreen> {
+class _ThreadView extends StatefulWidget {
+  const _ThreadView();
+
+  @override
+  State<_ThreadView> createState() => _ThreadViewState();
+}
+
+class _ThreadViewState extends State<_ThreadView> {
   final _form = GlobalKey<FormState>();
   final _reply = TextEditingController();
-  late Future<ForumThread> _future = _load();
-  bool _busy = false;
-
-  Future<ForumThread> _load() async =>
-      ForumThread.fromJson((await api.get('/forum/${Uri.encodeComponent(widget.id)}'))['thread'] as Map<String, dynamic>);
 
   @override
   void dispose() {
@@ -388,17 +382,15 @@ class _ThreadScreenState extends State<ThreadScreen> {
   Future<void> _send() async {
     if (!_form.currentState!.validate()) return;
     if (!await ensureLogin(context)) return;
-    setState(() => _busy = true);
-    try {
-      await api.post('/forum/${Uri.encodeComponent(widget.id)}/replies', body: {'content': Validators.clean(_reply.text)});
-      if (!mounted) return;
+    if (!mounted) return;
+    final vm = context.read<ThreadDetailViewModel>();
+    final ok = await vm.sendReply(_reply.text);
+    if (!mounted) return;
+    if (ok) {
       _reply.clear();
       FocusScope.of(context).unfocus();
-      setState(() => _future = _load());
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    } else {
+      showSnack(context, vm.sendError ?? 'Terjadi kesalahan. Coba lagi.');
     }
   }
 
@@ -407,18 +399,17 @@ class _ThreadScreenState extends State<ThreadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ThreadDetailViewModel>();
     final loggedIn = context.watch<AuthState>().isLoggedIn;
     return AppScaffold(
       title: 'Forum Diskusi',
       backgroundColor: Colors.white,
-      body: FutureBuilder<ForumThread>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.gold400));
-          }
-          if (snap.hasError) return ErrorView(message: snap.error.toString(), onRetry: () => setState(() => _future = _load()));
-          final t = snap.data!;
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (context) {
+          final t = vm.thread!;
           const brown = AppColors.wood700;
           return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 28), children: [
             Container(
@@ -507,8 +498,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         padding: const EdgeInsets.symmetric(vertical: 15),
                       ),
-                      onPressed: _busy ? null : _send,
-                      child: Text(_busy ? 'Mengirim...' : 'Kirim balasan', style: const TextStyle(fontSize: 16)),
+                      onPressed: vm.sending ? null : _send,
+                      child: Text(vm.sending ? 'Mengirim...' : 'Kirim balasan', style: const TextStyle(fontSize: 16)),
                     ),
                   ),
                 ]),

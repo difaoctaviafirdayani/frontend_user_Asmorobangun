@@ -1,21 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../models/models.dart';
+import '../repositories/announcement_repository.dart';
+import '../viewmodels/announcement_viewmodel.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 
 class AnnouncementsScreen extends StatelessWidget {
   const AnnouncementsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => AnnouncementViewModel(c.read<AnnouncementRepository>())..load(),
+      child: const _AnnouncementsView(),
+    );
+  }
+}
+
+class _AnnouncementsView extends StatelessWidget {
+  const _AnnouncementsView();
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<AnnouncementViewModel>();
     return AppScaffold(
       title: 'Pengumuman',
-      body: AsyncView<List<Announcement>>(
-        loader: () async => mapList((await api.get('/announcements'))['announcements'], Announcement.fromJson),
-        builder: (context, items, _) {
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (context) {
+          final items = vm.data!;
           if (items.isEmpty) return const EmptyState('Belum ada pengumuman.', icon: Icons.campaign_outlined);
           return ListView.separated(
             padding: const EdgeInsets.all(16),

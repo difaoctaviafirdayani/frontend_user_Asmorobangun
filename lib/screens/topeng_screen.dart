@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../core/api.dart';
 import '../core/auth_state.dart';
 import '../core/format.dart';
 import '../core/routes.dart';
 import '../core/theme.dart';
 import '../core/validators.dart';
 import '../models/models.dart';
+import '../repositories/topeng_repository.dart';
+import '../viewmodels/order_detail_viewmodel.dart';
+import '../viewmodels/topeng_assistant_viewmodel.dart';
+import '../viewmodels/topeng_detail_viewmodel.dart';
+import '../viewmodels/topeng_list_viewmodel.dart';
 import '../widgets/common.dart';
+import '../widgets/load_status_view.dart';
 import '../widgets/payment_section.dart';
 import '../widgets/reviews.dart';
 import 'auth_screens.dart';
@@ -25,28 +30,34 @@ Widget topengAiButton(BuildContext context) => FloatingActionButton(
 
 const _topengFill = Color(0xFFFDFBE8);
 
-const _countryCodes = <(String, String)>[
-  ('62', 'Indonesia'),
-  ('60', 'Malaysia'),
-  ('65', 'Singapura'),
-  ('673', 'Brunei'),
-  ('66', 'Thailand'),
-  ('63', 'Filipina'),
-  ('61', 'Australia'),
-];
-
 class TopengScreen extends StatelessWidget {
   const TopengScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => TopengListViewModel(c.read<TopengRepository>())..load(),
+      child: const _TopengListView(),
+    );
+  }
+}
+
+class _TopengListView extends StatelessWidget {
+  const _TopengListView();
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<TopengListViewModel>();
     return AppScaffold(
       title: 'Katalog Topeng Malangan',
       backgroundColor: Colors.white,
       floatingActionButton: topengAiButton(context),
-      body: AsyncView<List<Topeng>>(
-        loader: () async => mapList((await api.get('/topeng'))['topeng'], Topeng.fromJson),
-        builder: (context, items, _) {
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (context) {
+          final items = vm.data!;
           if (items.isEmpty) return const EmptyState('Katalog topeng belum tersedia.', icon: Icons.face_retouching_natural_outlined);
           return GridView.builder(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -97,16 +108,28 @@ class TopengDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => TopengDetailViewModel(c.read<TopengRepository>(), id)..load(),
+      child: const _TopengDetailView(),
+    );
+  }
+}
+
+class _TopengDetailView extends StatelessWidget {
+  const _TopengDetailView();
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<TopengDetailViewModel>();
     return AppScaffold(
       title: 'Katalog Topeng Malangan',
       backgroundColor: Colors.white,
       floatingActionButton: topengAiButton(context),
-      body: AsyncView<(Topeng, List<Review>)>(
-        loader: () async {
-          final res = await api.get('/topeng/$id');
-          return (Topeng.fromJson(res['topeng'] as Map<String, dynamic>), mapList(res['reviews'], Review.fromJson));
-        },
-        builder: (context, data, _) => _TopengBody(topeng: data.$1, reviews: data.$2),
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (_) => _TopengBody(topeng: vm.detail!.topeng, reviews: vm.detail!.reviews),
       ),
     );
   }
@@ -123,26 +146,8 @@ class _TopengBody extends StatefulWidget {
 
 class _TopengBodyState extends State<_TopengBody> {
   final _formKey = GlobalKey<FormState>();
-  int _qty = 1;
-  bool _busy = false;
   final _phone = TextEditingController();
   final _message = TextEditingController();
-
-  String _dial = '62';
-
-  String get _fullPhone {
-    final digits = _phone.text.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^0+'), '');
-    return digits.isEmpty ? '' : '+$_dial$digits';
-  }
-
-  String? _validatePhone() {
-    final full = _fullPhone;
-    if (full.isEmpty) return 'Nomor WhatsApp wajib diisi';
-    if (_dial == '62') return Validators.phone(full, required: true);
-    final n = full.length - 1 - _dial.length; // jumlah digit nomor
-    if (n < 6 || n > 14) return 'Nomor tidak valid';
-    return null;
-  }
 
   @override
   void initState() {
@@ -159,25 +164,19 @@ class _TopengBodyState extends State<_TopengBody> {
     super.dispose();
   }
 
-    Future<void> _order() async {
+  Future<void> _order() async {
     if (!_formKey.currentState!.validate()) return;
     if (!await ensureLogin(context)) return;
-    setState(() => _busy = true);
-    try {
-      final res = await api.post('/topeng/${widget.topeng.id}/order', body: {
-        'qty': _qty,
-        'buyerPhone': _fullPhone,
-        'message': Validators.clean(_message.text),
-      });
-      if (!mounted) return;
-      showSnack(context, 'Pesanan dibuat, silakan lanjut ke pembayaran!');
-      final order = TopengOrder.fromJson(res['order'] as Map<String, dynamic>);
-      Navigator.pushNamed(context, Routes.order, arguments: order.id);
-    } on ApiException catch (e) {
-      if (mounted) showSnack(context, e.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    if (!mounted) return;
+    final vm = context.read<TopengDetailViewModel>();
+    final order = await vm.placeOrder(phone: _phone.text, message: _message.text);
+    if (!mounted) return;
+    if (order == null) {
+      showSnack(context, vm.orderError ?? 'Terjadi kesalahan. Coba lagi.');
+      return;
     }
+    showSnack(context, 'Pesanan dibuat, silakan lanjut ke pembayaran!');
+    Navigator.pushNamed(context, Routes.order, arguments: order.id);
   }
 
   OutlineInputBorder _border([Color c = AppColors.wood700, double w = 1.5]) =>
@@ -202,12 +201,12 @@ class _TopengBodyState extends State<_TopengBody> {
         child: Text(text, style: const TextStyle(fontSize: 16, color: AppColors.wood700)),
       );
 
-  Widget _qtyStepper() => Row(children: [
+  Widget _qtyStepper(TopengDetailViewModel vm) => Row(children: [
         InkWell(
-          onTap: _qty > 1 ? () => setState(() => _qty--) : null,
+          onTap: vm.canDecrease ? vm.decrease : null,
           child: Padding(
             padding: const EdgeInsets.all(6),
-            child: Icon(Icons.remove, color: _qty > 1 ? AppColors.wood700 : AppColors.line),
+            child: Icon(Icons.remove, color: vm.canDecrease ? AppColors.wood700 : AppColors.line),
           ),
         ),
         Container(
@@ -219,19 +218,20 @@ class _TopengBodyState extends State<_TopengBody> {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.wood700, width: 1.3),
           ),
-          child: Text('$_qty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.wood700)),
+          child: Text('${vm.qty}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.wood700)),
         ),
         InkWell(
-          onTap: _qty < 99 ? () => setState(() => _qty++) : null,
+          onTap: vm.canIncrease ? vm.increase : null,
           child: Padding(
             padding: const EdgeInsets.all(6),
-            child: Icon(Icons.add, color: _qty < 99 ? AppColors.wood700 : AppColors.line),
+            child: Icon(Icons.add, color: vm.canIncrease ? AppColors.wood700 : AppColors.line),
           ),
         ),
       ]);
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<TopengDetailViewModel>();
     final t = widget.topeng;
     final loggedIn = context.watch<AuthState>().isLoggedIn;
     const brown = AppColors.wood700;
@@ -299,7 +299,7 @@ class _TopengBodyState extends State<_TopengBody> {
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _label('Jumlah Pesan'),
-                _qtyStepper(),
+                _qtyStepper(vm),
                 const SizedBox(height: 14),
                 _label('Nomor WhatsApp'),
                 TextFormField(
@@ -311,13 +311,13 @@ class _TopengBodyState extends State<_TopengBody> {
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       PopupMenuButton<String>(
                         tooltip: 'Kode negara',
-                        initialValue: _dial,
+                        initialValue: vm.dial,
                         color: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         constraints: const BoxConstraints(minWidth: 220, maxHeight: 340),
-                        onSelected: (v) => setState(() => _dial = v),
+                        onSelected: vm.selectDial,
                         itemBuilder: (_) => [
-                          for (final c in _countryCodes)
+                          for (final c in TopengDetailViewModel.countryCodes)
                             PopupMenuItem<String>(
                               value: c.$1,
                               height: 40,
@@ -326,7 +326,7 @@ class _TopengBodyState extends State<_TopengBody> {
                             ),
                         ],
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Text('+$_dial', style: const TextStyle(fontSize: 15, color: AppColors.wood700)),
+                          Text('+${vm.dial}', style: const TextStyle(fontSize: 15, color: AppColors.wood700)),
                           const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.inkSoft),
                         ]),
                       ),
@@ -334,7 +334,7 @@ class _TopengBodyState extends State<_TopengBody> {
                       const SizedBox(height: 26, child: VerticalDivider(width: 1, thickness: 1.2, color: AppColors.wood700)),
                     ]),
                   )),
-                  validator: (_) => _validatePhone(),
+                  validator: (v) => vm.validatePhone(v ?? ''),
                 ),
                 const SizedBox(height: 18),
                 _label('Catatan Tambahan'),
@@ -354,8 +354,8 @@ class _TopengBodyState extends State<_TopengBody> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
-                    onPressed: _busy ? null : _order,
-                    child: Text(_busy ? 'Memproses...' : 'Pesan', style: const TextStyle(fontSize: 19)),
+                    onPressed: vm.busy ? null : _order,
+                    child: Text(vm.busy ? 'Memproses...' : 'Pesan', style: const TextStyle(fontSize: 19)),
                   ),
                 ),
               ]),
@@ -372,6 +372,18 @@ class _TopengBodyState extends State<_TopengBody> {
 class OrderDetailScreen extends StatelessWidget {
   final String orderId;
   const OrderDetailScreen({super.key, required this.orderId});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => OrderDetailViewModel(c.read<TopengRepository>(), orderId)..load(),
+      child: const _OrderDetailView(),
+    );
+  }
+}
+
+class _OrderDetailView extends StatelessWidget {
+  const _OrderDetailView();
 
   Widget _section(String text, {double top = 24}) => Padding(
         padding: EdgeInsets.only(top: top, bottom: 10),
@@ -403,13 +415,22 @@ class OrderDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<OrderDetailViewModel>();
     return AppScaffold(
       title: 'Katalog Topeng Malangan',
       backgroundColor: Colors.white,
       floatingActionButton: topengAiButton(context),
-      body: AsyncView<TopengOrder>(
-        loader: () async => TopengOrder.fromJson((await api.get('/topeng/orders/$orderId'))['order'] as Map<String, dynamic>),
-        builder: (context, o, reload) => ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
+      body: LoadStatusView(
+        status: vm.status,
+        error: vm.error,
+        onRetry: vm.load,
+        builder: (context) => _content(vm.data!, vm.load),
+      ),
+    );
+  }
+
+  Widget _content(TopengOrder o, VoidCallback reload) =>
+      ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
           Text('Detail Transaksi', style: headingStyle(size: 20, color: AppColors.wood700)),
           const SizedBox(height: 10),
           _box(
@@ -447,10 +468,7 @@ class OrderDetailScreen extends StatelessWidget {
               onDone: reload,
             ),
           ],
-        ]),
-      ),
-    );
-  }
+      ]);
 }
 
 void showTopengAI(BuildContext context) {
@@ -463,33 +481,28 @@ void showTopengAI(BuildContext context) {
   );
 }
 
-class _AiMessage {
-  final bool fromUser;
-  final String text;
-  _AiMessage(this.fromUser, this.text);
-}
-
-class _TopengAiSheet extends StatefulWidget {
+class _TopengAiSheet extends StatelessWidget {
   const _TopengAiSheet();
 
   @override
-  State<_TopengAiSheet> createState() => _TopengAiSheetState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (c) => TopengAssistantViewModel(c.read<TopengRepository>()),
+      child: const _TopengAiView(),
+    );
+  }
 }
 
-class _TopengAiSheetState extends State<_TopengAiSheet> {
+class _TopengAiView extends StatefulWidget {
+  const _TopengAiView();
+
+  @override
+  State<_TopengAiView> createState() => _TopengAiViewState();
+}
+
+class _TopengAiViewState extends State<_TopengAiView> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
-  final List<_AiMessage> _messages = [
-    _AiMessage(false, 'Halo! Aku Asisten Topeng. Tanya apa saja soal Topeng Malangan: sejarah, tokoh, makna warna, perawatan, sampai katalog di sini.'),
-  ];
-  bool _busy = false;
-
-  static const _suggestions = [
-    'Apa makna warna topeng?',
-    'Siapa itu tokoh Klana?',
-    'Bagaimana cara merawat topeng kayu?',
-    'Bisa pesan topeng custom?',
-  ];
 
   @override
   void dispose() {
@@ -499,28 +512,14 @@ class _TopengAiSheetState extends State<_TopengAiSheet> {
   }
 
   Future<void> _send([String? preset]) async {
+    final vm = context.read<TopengAssistantViewModel>();
     final text = (preset ?? _input.text).trim();
-    if (text.isEmpty || _busy) return;
-    final history = _messages
-        .skip(1)
-        .map((m) => {'role': m.fromUser ? 'user' : 'assistant', 'content': m.text})
-        .toList();
-    setState(() {
-      _messages.add(_AiMessage(true, text));
-      _input.clear();
-      _busy = true;
-    });
+    if (text.isEmpty || vm.busy) return;
+    _input.clear();
+    final sending = vm.send(text);
     _scrollDown();
-    try {
-      final res = await api.post('/ai/chat', body: {'message': text, 'history': history});
-      if (!mounted) return;
-      setState(() => _messages.add(_AiMessage(false, (res['reply'] ?? '').toString())));
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _messages.add(_AiMessage(false, 'Maaf, ada kendala: ${e.message}')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-      _scrollDown();
-    }
+    await sending;
+    _scrollDown();
   }
 
   void _scrollDown() {
@@ -533,6 +532,7 @@ class _TopengAiSheetState extends State<_TopengAiSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<TopengAssistantViewModel>();
     final inset = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: inset),
@@ -553,15 +553,15 @@ class _TopengAiSheetState extends State<_TopengAiSheet> {
             child: ListView.builder(
               controller: _scroll,
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              itemCount: _messages.length + (_busy ? 1 : 0),
+              itemCount: vm.messages.length + (vm.busy ? 1 : 0),
               itemBuilder: (context, i) {
-                if (i == _messages.length) {
+                if (i == vm.messages.length) {
                   return const Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(padding: EdgeInsets.all(10), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gold400))),
                   );
                 }
-                final m = _messages[i];
+                final m = vm.messages[i];
                 return Align(
                   alignment: m.fromUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
@@ -578,14 +578,14 @@ class _TopengAiSheetState extends State<_TopengAiSheet> {
               },
             ),
           ),
-          if (_messages.length == 1)
+          if (vm.isFresh)
             SizedBox(
               height: 44,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 children: [
-                  for (final s in _suggestions)
+                  for (final s in TopengAssistantViewModel.suggestions)
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ActionChip(label: Text(s), onPressed: () => _send(s)),
@@ -607,7 +607,7 @@ class _TopengAiSheetState extends State<_TopengAiSheet> {
               const SizedBox(width: 8),
               IconButton.filled(
                 style: IconButton.styleFrom(backgroundColor: AppColors.wood800),
-                onPressed: _busy ? null : () => _send(),
+                onPressed: vm.busy ? null : () => _send(),
                 icon: const Icon(Icons.send_rounded),
               ),
             ]),
